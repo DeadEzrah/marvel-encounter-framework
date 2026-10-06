@@ -1,0 +1,104 @@
+{
+  "id": "city-intersection-crisis",
+  "name": "City Intersection Crisis",
+  "version": "0.1.0",
+  "scene": {
+    "name": "City Intersection Crisis",
+    "gridSize": 100,
+    "gridDistance": 5,
+    "gridUnits": "ft"
+  },
+  "clocks": [
+    {
+      "id": "building-collapse",
+      "name": "Building Integrity",
+      "max": 6,
+      "value": 0,
+      "public": true
+    }
+  ],
+  "objectives": [
+    {
+      "id": "rescue-civilians",
+      "name": "Rescue the Civilians",
+      "type": "counter",
+      "primary": true,
+      "public": true,
+      "target": 6,
+      "value": 0,
+      "status": "active"
+    },
+    {
+      "id": "keep-building-standing",
+      "name": "Keep the Building Standing",
+      "type": "binary",
+      "primary": false,
+      "public": true,
+      "status": "active"
+    }
+  ],
+  "phases": [
+    {
+      "id": "impact",
+      "name": "Initial Impact",
+      "order": 1,
+      "onEnter": [
+        {
+          "type": "chat-message",
+          "text": "<h3>City Intersection Crisis</h3><p>The intersection is shattered, but the damaged structures are still holding.</p>"
+        }
+      ]
+    },
+    {
+      "id": "critical",
+      "name": "Critical Damage",
+      "order": 2,
+      "trigger": {
+        "clock": "building-collapse",
+        "gte": 4
+      },
+      "onEnter": [
+        {
+          "type": "chat-message",
+          "text": "<p><strong>Critical Damage:</strong> the facade groans and debris begins to fall.</p>"
+        },
+        {
+          "type": "play-vfx",
+          "profile": "environment.structure.dust"
+        }
+      ]
+    },
+    {
+      "id": "collapse",
+      "name": "Collapse",
+      "order": 3,
+      "trigger": {
+        "clock": "building-collapse",
+        "gte": 6
+      },
+      "onEnter": [
+        {
+          "type": "chat-message",
+          "text": "<p><strong>Collapse:</strong> steel, glass, and concrete give way.</p>"
+        },
+        {
+          "type": "play-vfx",
+          "profile": "environment.structure.collapse"
+        }
+      ]
+    }
+  ],
+  "triggers": [
+    {
+      "id": "collapse-clock-round",
+      "event": "combat.roundEnd",
+      "actions": [
+        {
+          "type": "increment-clock",
+          "clock": "building-collapse",
+          "amount": 1
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,35 @@
+{
+  "id": "marvel-encounter-framework",
+  "type": "module",
+  "title": "Marvel Encounter Framework",
+  "description": "A lightweight encounter orchestration layer for Marvel Multiverse on Foundry VTT. The game system owns rules; Foundry owns scene documents; this module coordinates encounter state, objectives, clocks, phases, Regions, and future VFX integrations.",
+  "version": "0.2.0",
+  "compatibility": {
+    "minimum": "14",
+    "verified": "14.365"
+  },
+  "authors": [
+    {
+      "name": "Marvel Encounter Framework Project"
+    }
+  ],
+  "esmodules": [
+    "scripts/main.js"
+  ],
+  "styles": [
+    "styles/marvel-encounters.css"
+  ],
+  "relationships": {
+    "systems": [
+      {
+        "id": "marvel-multiverse",
+        "type": "system",
+        "compatibility": {
+          "minimum": "3.0.0",
+          "verified": "3.0.0"
+        }
+      }
+    ]
+  },
+  "readme": "README.md"
+}

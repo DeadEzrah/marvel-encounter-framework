@@ -1,0 +1,132 @@
+<section class="mef-shell">
+  <header class="mef-header">
+    <div>
+      <h2><i class="fa-solid fa-burst"></i> Marvel Encounter Framework</h2>
+      <p>Foundry orchestrates the scene. The Marvel system owns the rules.</p>
+    </div>
+  </header>
+
+  {{#unless isGM}}
+    <div class="mef-empty">The encounter dashboard is GM-only.</div>
+  {{else}}
+    <div class="mef-card">
+      <div class="mef-row mef-row-wrap">
+        <label class="mef-grow">
+          <span>Encounter</span>
+          <select name="encounterId">
+            {{#each encounters}}
+              <option value="{{id}}" {{#if active}}selected{{/if}}>{{name}}</option>
+            {{/each}}
+          </select>
+        </label>
+
+        <button type="button" data-action="activate">
+          <i class="fa-solid fa-play"></i> Activate
+        </button>
+
+        <button type="button" data-action="reset" class="mef-danger">
+          <i class="fa-solid fa-rotate-left"></i> Reset
+        </button>
+      </div>
+    </div>
+
+    {{#if activeEncounter}}
+      <div class="mef-active-title">
+        <div>
+          <span class="mef-kicker">ACTIVE ENCOUNTER</span>
+          <h3>{{activeEncounter.name}}</h3>
+        </div>
+        <div class="mef-phase">
+          <span>Phase</span>
+          <strong>{{#if phase}}{{phase.name}}{{else}}None{{/if}}</strong>
+        </div>
+      </div>
+
+      <div class="mef-grid">
+        <section class="mef-card">
+          <div class="mef-section-heading">
+            <h3>Objectives</h3>
+          </div>
+
+          {{#each objectives}}
+            <div class="mef-objective {{#if completed}}is-complete{{/if}} {{#if failed}}is-failed{{/if}}">
+              <button type="button"
+                      class="mef-icon-button"
+                      data-action="toggleObjective"
+                      data-objective-id="{{id}}"
+                      title="Toggle completion">
+                {{#if completed}}
+                  <i class="fa-solid fa-circle-check"></i>
+                {{else}}
+                  <i class="fa-regular fa-circle"></i>
+                {{/if}}
+              </button>
+
+              <div class="mef-grow">
+                <strong>{{name}}</strong>
+                <small>{{status}}{{#if primary}} · Primary{{/if}}</small>
+              </div>
+
+              {{#if hasTarget}}
+                <span class="mef-counter">{{value}} / {{target}}</span>
+                <button type="button"
+                        class="mef-icon-button"
+                        data-action="incrementObjective"
+                        data-objective-id="{{id}}">
+                  <i class="fa-solid fa-plus"></i>
+                </button>
+              {{/if}}
+            </div>
+          {{else}}
+            <div class="mef-empty">No objectives.</div>
+          {{/each}}
+        </section>
+
+        <section class="mef-card">
+          <div class="mef-section-heading">
+            <h3>Encounter Clocks</h3>
+          </div>
+
+          {{#each clocks}}
+            <div class="mef-clock">
+              <div class="mef-row">
+                <div class="mef-grow">
+                  <strong>{{name}}</strong>
+                  <small>{{value}} / {{max}}</small>
+                </div>
+                <button type="button"
+                        class="mef-icon-button"
+                        data-action="decrementClock"
+                        data-clock-id="{{id}}">
+                  <i class="fa-solid fa-minus"></i>
+                </button>
+                <button type="button"
+                        class="mef-icon-button"
+                        data-action="incrementClock"
+                        data-clock-id="{{id}}">
+                  <i class="fa-solid fa-plus"></i>
+                </button>
+              </div>
+              <progress value="{{value}}" max="{{max}}"></progress>
+            </div>
+          {{else}}
+            <div class="mef-empty">No clocks.</div>
+          {{/each}}
+        </section>
+      </div>
+
+      <section class="mef-card">
+        <div class="mef-row mef-row-wrap">
+          <button type="button" data-action="advancePhase">
+            <i class="fa-solid fa-forward-step"></i> Advance Phase
+          </button>
+          <span class="mef-muted">Marvel {{system.version}} · Foundry orchestration first pass</span>
+        </div>
+      </section>
+    {{else}}
+      <div class="mef-empty mef-large-empty">
+        Activate an encounter to begin.
+      </div>
+    {{/if}}
+  {{/unless}}
+</section>
