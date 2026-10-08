@@ -167,14 +167,15 @@ export class FoundrySceneAdapter {
       if (!actor || actor.documentName !== "Actor") {
         throw new Error(`Actor UUID '${rosterEntry.uuid}' could not be resolved.`);
       }
+      const spawnActor = await this.#ensureWorldActor(actor, encounter, rosterEntry);
 
       const count = Math.max(1, Number(placement.count ?? 1));
       for (let index = 0; index < count; index++) {
-        const token = await actor.getTokenDocument({
+        const token = await spawnActor.getTokenDocument({
           x: Number(placement.x ?? action.x ?? 0) + (Number(placement.offsetX ?? 0) * index),
           y: Number(placement.y ?? action.y ?? 0) + (Number(placement.offsetY ?? 0) * index),
           hidden: placement.hidden ?? action.hidden ?? false,
-          name: placement.name ?? actor.name,
+          name: placement.name ?? spawnActor.name,
           flags: {
             [MODULE_ID]: {
               encounterId: encounter.id,
@@ -191,6 +192,33 @@ export class FoundrySceneAdapter {
 
     const tokens = await scene.createEmbeddedDocuments("Token", tokenData);
     return { ok: true, sceneId: scene.id, tokenIds: tokens.map(token => token.id) };
+  }
+
+  async #ensureWorldActor(actor, encounter, rosterEntry) {
+    if (!actor.pack) return actor;
+
+    const sourceUuid = actor.uuid ?? rosterEntry.uuid;
+    const existing = game.actors?.find?.(candidate =>
+      candidate.getFlag?.(MODULE_ID, "sourceUuid") === sourceUuid
+    );
+    if (existing) return existing;
+
+    const data = actor.toObject();
+    delete data._id;
+    delete data._key;
+    data.flags = foundry.utils.deepClone(data.flags ?? {});
+    data.flags[MODULE_ID] = {
+      ...(data.flags[MODULE_ID] ?? {}),
+      sourceUuid,
+      encounterId: encounter.id,
+      rosterId: rosterEntry.id
+    };
+
+    const imported = await Actor.create(data);
+    if (!imported) {
+      throw new Error(`Actor UUID '${sourceUuid}' could not be imported into the world.`);
+    }
+    return imported;
   }
 
   async playSound(src, { volume = 0.8, loop = false } = {}) {

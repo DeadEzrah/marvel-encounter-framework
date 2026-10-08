@@ -2,6 +2,11 @@
 
 All notable changes to the Marvel Encounter Framework should be documented in this file.
 
+## [0.6.1] - 2026-10-08
+
+### Fixed
+- Compendium-backed encounter reinforcements now import and reuse a world Actor before token creation, so spawned tokens retain valid Actor references and can be opened normally.
+
 ## [0.6.0] - 2026-10-08
 
 ### Added
