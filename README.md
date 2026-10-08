@@ -23,6 +23,8 @@ This is the installable vertical-slice build of the Marvel Encounter Framework.
 - Foundry Scene adapter shell
 - Split encounter-package loading
 - Scene creation and binding from encounter-pack exports
+- Actor rosters backed by compendium UUIDs
+- One-time round, phase, or clock-triggered reinforcement spawning
 - Marvel Multiverse public API adapter
 - Semantic VFX routed through the system's JB2A/Sequencer effect library
 
@@ -51,7 +53,7 @@ Those are deliberately deferred until this shell is proven stable in your Foundr
 3. Restart Foundry.
 4. Open your Marvel Multiverse world.
 5. Enable **Marvel Encounter Framework** under Manage Modules.
-6. As GM, open **Settings**. A `Marvel Encounter Framework` button should be appended there.
+6. As GM, click the burst icon beside **Settings** in the right sidebar, or open **Settings** and click `Marvel Encounter Framework`.
 7. Open the dashboard and activate **City Intersection Crisis**.
 
 You can also open it from the browser console:
@@ -106,6 +108,38 @@ Split encounter packages can use the same method, or the explicit alias:
 await game.marvelEncounters.registerEncounterPackageFromUrl(
   "modules/marvel-encounter-packs/packs/city-intersection-crisis/encounter.json"
 );
+```
+
+Encounter packages can define reusable Actors in an `actors.json` roster:
+
+```json
+[
+  {
+    "id": "alien-vanguard",
+    "uuid": "Compendium.marvel-character-library.minions.Actor.mefAlienVangrd01"
+  }
+]
+```
+
+Then spawn them from any phase or trigger:
+
+```json
+{
+  "id": "round-seven-reinforcements",
+  "event": "combat.roundStart",
+  "once": true,
+  "conditions": [{ "path": "combat.round", "op": "==", "value": 7 }],
+  "actions": [{
+    "type": "spawn-actors",
+    "actors": [{
+      "actor": "alien-vanguard",
+      "count": 3,
+      "x": 1200,
+      "y": 800,
+      "offsetX": 100
+    }]
+  }]
+}
 ```
 
 ## Architectural boundary

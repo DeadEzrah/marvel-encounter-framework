@@ -16,14 +16,22 @@ export class TriggerEngine {
     const results = [];
 
     for (const trigger of triggers) {
+      if (trigger.once && this.manager.store.state.firedTriggers?.includes(trigger.id)) continue;
       if (!this.#conditionsPass(trigger.conditions ?? [], context)) continue;
-      results.push({
+      const result = {
         trigger: trigger.id ?? null,
         actions: await this.resolver.executeMany(trigger.actions ?? [], {
           ...context,
           source: `trigger:${trigger.id ?? event}`
         })
-      });
+      };
+      results.push(result);
+
+      if (trigger.once && trigger.id) {
+        this.manager.store.state.firedTriggers ??= [];
+        this.manager.store.state.firedTriggers.push(trigger.id);
+        await this.manager.store.save();
+      }
     }
 
     return results;

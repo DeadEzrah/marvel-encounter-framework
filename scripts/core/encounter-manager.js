@@ -32,6 +32,7 @@ export class EncounterManager {
       phaseId: phase?.id ?? null,
       clocks: {},
       objectives: {},
+      firedTriggers: [],
       lastCombatRound: game.combat?.round ?? null,
       history: []
     };

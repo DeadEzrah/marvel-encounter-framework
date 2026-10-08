@@ -14,6 +14,7 @@ export class RuntimeStore {
       phaseId: null,
       clocks: {},
       objectives: {},
+      firedTriggers: [],
       lastCombatRound: null,
       history: []
     };

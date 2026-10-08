@@ -121,6 +121,33 @@ function addSettingsButton(application, element) {
   target.append(button);
 }
 
+function addSidebarButton(_application, element = document.querySelector("#sidebar")) {
+  if (!game.user.isGM) return;
+
+  const sidebar = element?.matches?.("#sidebar")
+    ? element
+    : element?.querySelector?.("#sidebar") ?? document.querySelector("#sidebar");
+  const menu = sidebar?.querySelector?.("#sidebar-tabs > menu");
+  if (!menu || menu.querySelector(".mef-sidebar-launch")) return;
+
+  const item = document.createElement("li");
+  const button = document.createElement("button");
+  button.type = "button";
+  button.classList.add("ui-control", "plain", "icon", "fa-solid", "fa-burst", "mef-sidebar-launch");
+  button.setAttribute("aria-label", MODULE_TITLE);
+  button.dataset.tooltip = MODULE_TITLE;
+  button.title = MODULE_TITLE;
+  button.addEventListener("click", event => {
+    event.preventDefault();
+    event.stopPropagation();
+    game.marvelEncounters.openDashboard();
+  });
+  item.append(button);
+
+  const settingsItem = menu.querySelector("[data-tab='settings']")?.closest("li");
+  menu.insertBefore(item, settingsItem ?? menu.lastElementChild);
+}
+
 Hooks.once("init", () => {
   registerSettings();
   Logger.info("Initializing");
@@ -137,6 +164,7 @@ Hooks.once("ready", async () => {
   }
 
   exposeApi();
+  addSidebarButton();
   Hooks.callAll("marvel-encounter-framework.ready", game.marvelEncounters);
 
   Hooks.on("updateCombat", async (combat, changes) => {
@@ -150,9 +178,10 @@ Hooks.once("ready", async () => {
 
   Logger.info("Ready");
   if (game.user.isGM) {
-    ui.notifications?.info("Marvel Encounter Framework ready. Open it from Settings or game.marvelEncounters.openDashboard().");
+    ui.notifications?.info("Marvel Encounter Framework ready. Open it from the sidebar burst button or Settings.");
   }
 });
 
+Hooks.on("renderSidebar", addSidebarButton);
 Hooks.on("renderSettings", addSettingsButton);
 Hooks.on("renderSettingsConfig", addSettingsButton);

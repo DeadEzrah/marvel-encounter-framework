@@ -1,6 +1,68 @@
 import { Logger } from "../core/logger.js";
 import { MODULE_ID } from "../core/constants.js";
 
+export function applySceneArtwork(data, descriptor = {}) {
+  const legacyBackground = data.background && typeof data.background === "object"
+    ? data.background
+    : {};
+  const legacyForeground = typeof data.foreground === "string"
+    ? { src: data.foreground }
+    : data.foreground && typeof data.foreground === "object"
+      ? data.foreground
+      : {};
+  const levels = Array.isArray(data.levels) && data.levels.length
+    ? data.levels
+    : [{}];
+  const level = levels[0];
+
+  level._id ??= data.initialLevel ?? "defaultLevel0000";
+  level.name ??= "Level";
+  level.elevation = {
+    bottom: 0,
+    top: Number(data.foregroundElevation ?? 20),
+    ...(level.elevation ?? {})
+  };
+  level.background = {
+    color: data.backgroundColor ?? "#999999",
+    tint: "#ffffff",
+    alphaThreshold: 0.75,
+    ...(level.background ?? {}),
+    src: descriptor.background ?? level.background?.src ?? legacyBackground.src ?? null
+  };
+  level.foreground = {
+    tint: "#ffffff",
+    alphaThreshold: 0.75,
+    ...(level.foreground ?? {}),
+    src: descriptor.foreground ?? level.foreground?.src ?? legacyForeground.src ?? null
+  };
+  level.fog = {
+    src: data.fog?.overlay ?? null,
+    ...(level.fog ?? {})
+  };
+  level.textures = {
+    anchorX: legacyBackground.anchorX ?? 0.5,
+    anchorY: legacyBackground.anchorY ?? 0.5,
+    offsetX: legacyBackground.offsetX ?? 0,
+    offsetY: legacyBackground.offsetY ?? 0,
+    fit: legacyBackground.fit ?? "fill",
+    scaleX: legacyBackground.scaleX ?? 1,
+    scaleY: legacyBackground.scaleY ?? 1,
+    rotation: legacyBackground.rotation ?? 0,
+    ...(level.textures ?? {})
+  };
+  level.visibility ??= { levels: [] };
+  level.sort ??= 0;
+  level.flags ??= {};
+
+  data.levels = levels;
+  data.initialLevel = level._id;
+  delete data.background;
+  delete data.backgroundColor;
+  delete data.foreground;
+  delete data.foregroundElevation;
+  return data;
+}
+
 export class FoundrySceneAdapter {
   async ensureEncounterScene(encounter) {
     const descriptor = encounter?.scene;
@@ -29,12 +91,7 @@ export class FoundrySceneAdapter {
       [MODULE_ID]: { encounterId: encounter.id }
     }, { inplace: false });
 
-    if (descriptor.background) {
-      data.background = foundry.utils.mergeObject(data.background ?? {}, {
-        src: descriptor.background
-      }, { inplace: false });
-    }
-    if (descriptor.foreground) data.foreground = descriptor.foreground;
+    applySceneArtwork(data, descriptor);
     if (!data.grid && descriptor.gridSize) {
       data.grid = {
         type: descriptor.gridVisible === false ? 0 : 1,
@@ -76,6 +133,54 @@ export class FoundrySceneAdapter {
     const data = { content };
     if (whisperGM) data.whisper = ChatMessage.getWhisperRecipients("GM").map(u => u.id);
     return ChatMessage.create(data);
+  }
+
+  async spawnActors(encounter, action, context = {}) {
+    const scene = game.scenes?.get?.(action.sceneId ?? encounter?.sceneId)
+      ?? game.scenes?.get?.(game.marvelEncounters?.state?.sceneId)
+      ?? canvas?.scene;
+    if (!scene) throw new Error("Cannot spawn actors without an active encounter Scene.");
+
+    const roster = new Map((encounter?.actors ?? []).map(actor => [actor.id, actor]));
+    const placements = action.actors ?? [];
+    if (!Array.isArray(placements) || placements.length === 0) {
+      throw new Error("spawn-actors requires a non-empty actors array.");
+    }
+
+    const tokenData = [];
+    for (const placement of placements) {
+      const rosterEntry = roster.get(placement.actor);
+      if (!rosterEntry) throw new Error(`Encounter actor '${placement.actor}' is not defined.`);
+      if (!rosterEntry.uuid) throw new Error(`Encounter actor '${placement.actor}' has no compendium UUID.`);
+
+      const actor = await fromUuid(rosterEntry.uuid);
+      if (!actor || actor.documentName !== "Actor") {
+        throw new Error(`Actor UUID '${rosterEntry.uuid}' could not be resolved.`);
+      }
+
+      const count = Math.max(1, Number(placement.count ?? 1));
+      for (let index = 0; index < count; index++) {
+        const token = await actor.getTokenDocument({
+          x: Number(placement.x ?? action.x ?? 0) + (Number(placement.offsetX ?? 0) * index),
+          y: Number(placement.y ?? action.y ?? 0) + (Number(placement.offsetY ?? 0) * index),
+          hidden: placement.hidden ?? action.hidden ?? false,
+          name: placement.name ?? actor.name,
+          flags: {
+            [MODULE_ID]: {
+              encounterId: encounter.id,
+              rosterId: rosterEntry.id,
+              source: context.source ?? "action"
+            }
+          }
+        });
+        const data = token.toObject();
+        delete data._id;
+        tokenData.push(data);
+      }
+    }
+
+    const tokens = await scene.createEmbeddedDocuments("Token", tokenData);
+    return { ok: true, sceneId: scene.id, tokenIds: tokens.map(token => token.id) };
   }
 
   async playSound(src, { volume = 0.8, loop = false } = {}) {

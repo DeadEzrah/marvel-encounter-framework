@@ -28,6 +28,7 @@ test("loads and resolves a split encounter package", async () => {
       },
       objectives: ["objectives.json"],
       phases: ["phases.json"],
+      actors: ["actors.json"],
       clocks: [],
       triggers: []
     }],
@@ -40,6 +41,10 @@ test("loads and resolves a split encounter package", async () => {
       id: "start",
       name: "Start",
       order: 1
+    }]],
+    ["modules/packs/city/actors.json", [{
+      id: "reinforcement",
+      uuid: "Compendium.example.actors.Actor.reinforcement"
     }]]
   ]);
 
@@ -57,6 +62,7 @@ test("loads and resolves a split encounter package", async () => {
 
   assert.equal(encounter.objectives[0].id, "rescue");
   assert.equal(encounter.phases[0].id, "start");
+  assert.equal(encounter.actors[0].id, "reinforcement");
   assert.equal(encounter.scene.sceneData, "modules/packs/city/scene.json");
   assert.equal(encounter.scene.background, "modules/packs/city/art/background.png");
 });
@@ -93,4 +99,16 @@ test("rejects malformed trigger and phase action collections", () => {
   assert.equal(result.valid, false);
   assert.match(result.errors.join(" "), /has no event/);
   assert.match(result.errors.join(" "), /onEnter must be an array/);
+});
+
+test("rejects malformed actor rosters", () => {
+  const result = EncounterValidator.validate({
+    id: "invalid-actors",
+    name: "Invalid Actors",
+    version: "1.0.0",
+    actors: {}
+  });
+
+  assert.equal(result.valid, false);
+  assert.match(result.errors.join(" "), /actors must be an array/);
 });

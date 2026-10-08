@@ -43,7 +43,7 @@ export class EncounterRegistry {
     const manifest = await this.#fetchJson(manifestUrl, "encounter manifest");
     const resolved = foundry.utils.deepClone(manifest);
 
-    for (const collection of ["regions", "objects", "objectives", "phases"]) {
+    for (const collection of ["regions", "objects", "objectives", "phases", "actors"]) {
       resolved[collection] = await this.#resolveCollection(resolved[collection], manifestUrl, collection);
     }
 

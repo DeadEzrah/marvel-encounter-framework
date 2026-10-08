@@ -30,13 +30,19 @@ export class EncounterValidator {
       errors.push("phases must be an array.");
     }
 
+    if (manifest.actors && !Array.isArray(manifest.actors)) {
+      errors.push("actors must be an array.");
+    }
+
     if (manifest.compatibility?.system && manifest.compatibility.system !== "marvel-multiverse") {
       errors.push(`Unsupported target system: ${manifest.compatibility.system}`);
     }
 
     const ids = new Set();
-    for (const collection of ["clocks", "objectives", "phases", "regions", "objects", "triggers"]) {
-      for (const entry of manifest[collection] ?? []) {
+    for (const collection of ["clocks", "objectives", "phases", "regions", "objects", "actors", "triggers"]) {
+      const entries = manifest[collection];
+      if (entries != null && !Array.isArray(entries)) continue;
+      for (const entry of entries ?? []) {
         if (!entry || typeof entry !== "object" || typeof entry.id !== "string" || !entry.id.trim()) {
           errors.push(`${collection} contains an entry without an id.`);
           continue;
@@ -47,7 +53,7 @@ export class EncounterValidator {
       }
     }
 
-    for (const trigger of manifest.triggers ?? []) {
+    for (const trigger of Array.isArray(manifest.triggers) ? manifest.triggers : []) {
       if (typeof trigger.event !== "string" || !trigger.event.trim()) {
         errors.push(`Trigger '${trigger.id}' has no event.`);
       }
@@ -56,7 +62,7 @@ export class EncounterValidator {
       }
     }
 
-    for (const phase of manifest.phases ?? []) {
+    for (const phase of Array.isArray(manifest.phases) ? manifest.phases : []) {
       for (const field of ["onEnter", "onExit"]) {
         if (phase[field] != null && !Array.isArray(phase[field])) {
           errors.push(`Phase '${phase.id}' ${field} must be an array.`);
