@@ -2,6 +2,12 @@
 
 All notable changes to the Marvel Encounter Framework should be documented in this file.
 
+## [0.6.2] - 2026-10-08
+
+### Changed
+- Activating an encounter now switches the GM to its imported Scene before phase-entry actions run.
+- The dashboard now distinguishes the encounter selected for activation from the currently active encounter.
+
 ## [0.6.1] - 2026-10-08
 
 ### Fixed

@@ -85,6 +85,17 @@
   color: var(--mef-text-muted);
 }
 
+.mef-selection-hint {
+  display: block;
+  margin-top: 7px;
+  color: var(--mef-text-muted);
+}
+
+.mef-active-kicker {
+  color: var(--mef-accent);
+  font-weight: 700;
+}
+
 .mef-phase {
   text-align: right;
 }

@@ -23,6 +23,9 @@ export class EncounterManager {
     if (!encounter) throw new Error(`Encounter '${encounterId}' is not registered.`);
 
     const sceneResult = await this.sceneAdapter?.ensureEncounterScene(encounter);
+    if (game.user?.isGM && sceneResult?.scene) {
+      await sceneResult.scene.view();
+    }
     const phase = [...(encounter.phases ?? [])].sort((a, b) => (a.order ?? 0) - (b.order ?? 0))[0] ?? null;
 
     const next = {

@@ -3,10 +3,10 @@
   "type": "module",
   "title": "Marvel Encounter Framework",
   "description": "A lightweight encounter orchestration layer for Marvel Multiverse on Foundry VTT. The game system owns rules; Foundry owns scene documents; this module coordinates encounter state, objectives, clocks, phases, Regions, and future VFX integrations.",
-  "version": "0.6.1",
+  "version": "0.6.2",
   "url": "https://github.com/DeadEzrah/marvel-encounter-framework",
   "manifest": "https://raw.githubusercontent.com/DeadEzrah/marvel-encounter-framework/main/module.json",
-  "download": "https://github.com/DeadEzrah/marvel-encounter-framework/releases/download/release-0.6.1/marvel-encounter-framework-0.6.1.zip",
+  "download": "https://github.com/DeadEzrah/marvel-encounter-framework/releases/download/release-0.6.2/marvel-encounter-framework-0.6.2.zip",
   "compatibility": {
     "minimum": "14",
     "verified": "14.365"

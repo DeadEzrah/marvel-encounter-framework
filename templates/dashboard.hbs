@@ -12,28 +12,29 @@
     <div class="mef-card">
       <div class="mef-row mef-row-wrap">
         <label class="mef-grow">
-          <span>Encounter</span>
+          <span>Encounter to activate</span>
           <select name="encounterId">
             {{#each encounters}}
-              <option value="{{id}}" {{#if active}}selected{{/if}}>{{name}}</option>
+              <option value="{{id}}" {{#if active}}selected{{/if}}>{{name}}{{#if active}} — ACTIVE{{/if}}</option>
             {{/each}}
           </select>
         </label>
 
         <button type="button" data-action="activate">
-          <i class="fa-solid fa-play"></i> Activate
+          <i class="fa-solid fa-play"></i> Activate Selected
         </button>
 
         <button type="button" data-action="reset" class="mef-danger">
           <i class="fa-solid fa-rotate-left"></i> Reset
         </button>
       </div>
+      <small class="mef-selection-hint">Changing the selection does not change the active encounter until you click Activate Selected.</small>
     </div>
 
     {{#if activeEncounter}}
       <div class="mef-active-title">
         <div>
-          <span class="mef-kicker">ACTIVE ENCOUNTER</span>
+          <span class="mef-kicker mef-active-kicker">ACTIVE ENCOUNTER</span>
           <h3>{{activeEncounter.name}}</h3>
         </div>
         <div class="mef-phase">
