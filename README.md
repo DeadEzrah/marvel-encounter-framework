@@ -45,7 +45,15 @@ Those are deliberately deferred until this shell is proven stable in your Foundr
 
 ## Installation
 
-1. Unzip the package.
+In Foundry Setup, open **Add-on Modules**, select **Install Module**, and use:
+
+```text
+https://raw.githubusercontent.com/DeadEzrah/marvel-encounter-framework/main/module.json
+```
+
+For a manual installation:
+
+1. Download and unzip the release package.
 2. Copy the **`marvel-encounter-framework`** folder into:
 
    `{Foundry User Data}/Data/modules/`
@@ -55,6 +63,17 @@ Those are deliberately deferred until this shell is proven stable in your Foundr
 5. Enable **Marvel Encounter Framework** under Manage Modules.
 6. As GM, click the burst icon beside **Settings** in the right sidebar, use the burst icon in the Token controls, or open **Settings** and click `Marvel Encounter Framework`.
 7. Open the dashboard and activate **City Intersection Crisis**.
+
+## Release
+
+Update the version in `module.json` and `package.json`, including the version in the `download` URL, then run:
+
+```powershell
+npm run validate:release
+npm run release:github
+```
+
+The release command runs the test suite, creates the Foundry-ready ZIP, and publishes the ZIP and `module.json` under the matching `release-x.y.z` tag.
 
 You can also open it from the browser console:
 
