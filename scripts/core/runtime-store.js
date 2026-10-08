@@ -15,6 +15,7 @@ export class RuntimeStore {
       clocks: {},
       objectives: {},
       firedTriggers: [],
+      fxmasterEffects: {},
       lastCombatRound: null,
       history: []
     };

@@ -2,6 +2,17 @@
 
 All notable changes to the Marvel Encounter Framework should be documented in this file.
 
+## [0.5.0] - 2026-10-08
+
+### Added
+- Optional FXMaster and FXMaster+ particle/filter actions with core-tier fallbacks.
+- Persisted FXMaster effect IDs, targeted stop actions, Region effect controls, and encounter-reset cleanup.
+- Validation and tests for FXMaster action payloads and unavailable-module behavior.
+
+### Changed
+- FXMaster is recommended rather than required, so encounter rules continue when the visual module is inactive.
+- City Intersection Critical Damage now layers optional embers and fog over its semantic JB2A dust effect.
+
 ## [0.4.0] - 2026-10-08
 
 ### Added

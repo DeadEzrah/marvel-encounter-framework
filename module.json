@@ -3,7 +3,7 @@
   "type": "module",
   "title": "Marvel Encounter Framework",
   "description": "A lightweight encounter orchestration layer for Marvel Multiverse on Foundry VTT. The game system owns rules; Foundry owns scene documents; this module coordinates encounter state, objectives, clocks, phases, Regions, and future VFX integrations.",
-  "version": "0.4.0",
+  "version": "0.5.0",
   "compatibility": {
     "minimum": "14",
     "verified": "14.365"
@@ -28,6 +28,13 @@
           "minimum": "3.0.0",
           "verified": "3.1.0"
         }
+      }
+    ],
+    "recommends": [
+      {
+        "id": "fxmaster",
+        "type": "module",
+        "manifest": "https://github.com/gambit07/fxmaster/releases/latest/download/module.json"
       }
     ]
   },

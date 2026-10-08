@@ -76,6 +76,7 @@ export class EncounterManager {
 
   async reset() {
     const previous = this.store.state.activeEncounterId;
+    await this.triggerEngine?.resolver.stopFxMasterEffects({ skipFading: true });
     await this.store.reset();
     this.renderDashboard();
     ui.notifications?.info(previous ? "Marvel encounter reset." : "Marvel Encounter Framework runtime cleared.");

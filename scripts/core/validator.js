@@ -1,3 +1,7 @@
+import { ACTION_TYPES } from "./constants.js";
+
+const ACTION_TYPE_VALUES = new Set(Object.values(ACTION_TYPES));
+
 export class EncounterValidator {
   static validate(manifest) {
     const errors = [];
@@ -59,6 +63,8 @@ export class EncounterValidator {
       }
       if (trigger.actions != null && !Array.isArray(trigger.actions)) {
         errors.push(`Trigger '${trigger.id}' actions must be an array.`);
+      } else {
+        validateActions(trigger.actions, `Trigger '${trigger.id}'`, errors);
       }
     }
 
@@ -66,10 +72,35 @@ export class EncounterValidator {
       for (const field of ["onEnter", "onExit"]) {
         if (phase[field] != null && !Array.isArray(phase[field])) {
           errors.push(`Phase '${phase.id}' ${field} must be an array.`);
+        } else {
+          validateActions(phase[field], `Phase '${phase.id}' ${field}`, errors);
         }
       }
     }
 
     return { valid: errors.length === 0, errors, warnings };
+  }
+}
+
+function validateActions(actions, owner, errors) {
+  for (const action of actions ?? []) {
+    if (!ACTION_TYPE_VALUES.has(action?.type)) {
+      errors.push(`${owner} uses unknown action '${action?.type ?? "<missing>"}'.`);
+      continue;
+    }
+    if (action.type === ACTION_TYPES.PLAY_FXMASTER) {
+      if (typeof action.key !== "string" || !action.key.trim()) {
+        errors.push(`${owner} play-fxmaster action requires a key.`);
+      }
+      if (!action.core || typeof action.core !== "object" || Array.isArray(action.core)) {
+        errors.push(`${owner} play-fxmaster action requires a core effect payload.`);
+      }
+      if (action.plus != null && (typeof action.plus !== "object" || Array.isArray(action.plus))) {
+        errors.push(`${owner} play-fxmaster plus payload must be an object.`);
+      }
+    }
+    if (action.type === ACTION_TYPES.STOP_FXMASTER && (typeof action.key !== "string" || !action.key.trim())) {
+      errors.push(`${owner} stop-fxmaster action requires a key.`);
+    }
   }
 }

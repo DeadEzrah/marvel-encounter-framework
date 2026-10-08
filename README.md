@@ -1,8 +1,8 @@
 # Marvel Encounter Framework — First Pass
 
 **Target:** Foundry VTT 14.365  
-**System:** Marvel Multiverse 3.0.0  
-**Module version:** 0.2.0
+**System:** Marvel Multiverse 3.1.0
+**Module version:** 0.5.0
 
 This is the installable vertical-slice build of the Marvel Encounter Framework.
 
@@ -27,6 +27,7 @@ This is the installable vertical-slice build of the Marvel Encounter Framework.
 - One-time round, phase, or clock-triggered reinforcement spawning
 - Marvel Multiverse public API adapter
 - Semantic VFX routed through the system's JB2A/Sequencer effect library
+- Optional FXMaster/FXMaster+ scene effects with persisted IDs and reset cleanup
 
 ## Intentionally not implemented yet
 
@@ -141,6 +142,27 @@ Then spawn them from any phase or trigger:
   }]
 }
 ```
+
+FXMaster effects can provide a free-tier payload and an FXMaster+ payload. The framework selects the Plus payload when available and otherwise uses the core fallback:
+
+```json
+{
+  "type": "play-fxmaster",
+  "key": "critical-fire",
+  "core": {
+    "particles": [
+      { "type": "embers", "options": { "density": 0.05 } }
+    ]
+  },
+  "plus": {
+    "particles": [
+      { "type": "fire", "options": { "density": 0.05 } }
+    ]
+  }
+}
+```
+
+Use `stop-fxmaster` with the same `key` to remove one tracked effect group. Encounter reset removes all tracked FXMaster effects. `set-fxmaster-regions` starts or stops FXMaster Region behaviors without deleting their authored configuration.
 
 ## Architectural boundary
 

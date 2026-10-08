@@ -7,14 +7,16 @@ import { ActionResolver } from "./core/action-resolver.js";
 import { TriggerEngine } from "./core/trigger-engine.js";
 import { MarvelMultiverseAdapter } from "./adapters/marvel-multiverse-adapter.js";
 import { FoundrySceneAdapter } from "./adapters/foundry-scene-adapter.js";
+import { FxMasterAdapter } from "./adapters/fxmaster-adapter.js";
 import { EncounterDashboard } from "./apps/dashboard.js";
 
 const registry = new EncounterRegistry();
 const store = new RuntimeStore();
 const marvelAdapter = new MarvelMultiverseAdapter();
 const sceneAdapter = new FoundrySceneAdapter();
+const fxMasterAdapter = new FxMasterAdapter();
 const manager = new EncounterManager({ registry, store, sceneAdapter });
-const resolver = new ActionResolver({ manager, marvelAdapter, sceneAdapter });
+const resolver = new ActionResolver({ manager, marvelAdapter, sceneAdapter, fxMasterAdapter });
 const triggerEngine = new TriggerEngine({ manager, resolver });
 manager.triggerEngine = triggerEngine;
 
@@ -45,7 +47,8 @@ function exposeApi() {
     manager,
     adapters: {
       marvel: marvelAdapter,
-      scene: sceneAdapter
+      scene: sceneAdapter,
+      fxmaster: fxMasterAdapter
     },
 
     openDashboard() {

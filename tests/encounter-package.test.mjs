@@ -112,3 +112,37 @@ test("rejects malformed actor rosters", () => {
   assert.equal(result.valid, false);
   assert.match(result.errors.join(" "), /actors must be an array/);
 });
+
+test("validates FXMaster action keys and fallback payloads", () => {
+  const invalid = EncounterValidator.validate({
+    id: "invalid-fxmaster",
+    name: "Invalid FXMaster",
+    version: "1.0.0",
+    phases: [{
+      id: "critical",
+      onEnter: [{
+        type: "play-fxmaster",
+        plus: { particles: [] }
+      }]
+    }]
+  });
+  const valid = EncounterValidator.validate({
+    id: "valid-fxmaster",
+    name: "Valid FXMaster",
+    version: "1.0.0",
+    phases: [{
+      id: "critical",
+      onEnter: [{
+        type: "play-fxmaster",
+        key: "critical-fire",
+        core: { particles: [{ type: "embers", options: {} }] },
+        plus: { particles: [{ type: "fire", options: {} }] }
+      }]
+    }]
+  });
+
+  assert.equal(invalid.valid, false);
+  assert.match(invalid.errors.join(" "), /requires a key/);
+  assert.match(invalid.errors.join(" "), /requires a core effect payload/);
+  assert.equal(valid.valid, true);
+});

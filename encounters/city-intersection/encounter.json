@@ -65,6 +65,46 @@
         {
           "type": "play-vfx",
           "profile": "environment.structure.dust"
+        },
+        {
+          "type": "play-fxmaster",
+          "key": "city-critical-hazard",
+          "core": {
+            "particles": [
+              {
+                "type": "embers",
+                "options": {
+                  "density": 0.05,
+                  "speed": 0.7,
+                  "alpha": 0.55
+                }
+              },
+              {
+                "type": "fog",
+                "options": {
+                  "density": 0.04,
+                  "speed": 0.35,
+                  "alpha": 0.35,
+                  "tint": {
+                    "value": "#6b6259",
+                    "apply": true
+                  }
+                }
+              }
+            ]
+          },
+          "plus": {
+            "particles": [
+              {
+                "type": "fire",
+                "options": {
+                  "density": 0.05,
+                  "speed": 0.7,
+                  "alpha": 0.65
+                }
+              }
+            ]
+          }
         }
       ]
     },
