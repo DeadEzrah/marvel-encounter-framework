@@ -2,6 +2,20 @@
 
 All notable changes to the Marvel Encounter Framework should be documented in this file.
 
+## [0.6.0] - 2026-10-08
+
+### Added
+- A GM-only Marvel Encounters launcher in the Token scene controls.
+- Regression coverage for refreshing existing encounter artwork through Foundry 14 Scene Levels.
+
+### Changed
+- Existing encounter scenes now refresh packaged background and foreground artwork while preserving their level configuration.
+- Verified Health damage, Focus damage, and status actions against the Marvel Multiverse 3.2.0 public mutation API.
+
+### Fixed
+- Settings launchers now handle both native elements and legacy element wrappers.
+- Existing scene artwork no longer falls back to deprecated top-level background and foreground fields.
+
 ## [0.5.0] - 2026-10-08
 
 ### Added

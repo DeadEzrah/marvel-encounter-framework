@@ -1,8 +1,8 @@
 # Marvel Encounter Framework — First Pass
 
 **Target:** Foundry VTT 14.365  
-**System:** Marvel Multiverse 3.1.0
-**Module version:** 0.5.0
+**System:** Marvel Multiverse 3.2.0
+**Module version:** 0.6.0
 
 This is the installable vertical-slice build of the Marvel Encounter Framework.
 
@@ -26,15 +26,14 @@ This is the installable vertical-slice build of the Marvel Encounter Framework.
 - Actor rosters backed by compendium UUIDs
 - One-time round, phase, or clock-triggered reinforcement spawning
 - Marvel Multiverse public API adapter
+- Health damage, Focus damage, and actor status actions through the system's public mutation API
 - Semantic VFX routed through the system's JB2A/Sequencer effect library
 - Optional FXMaster/FXMaster+ scene effects with persisted IDs and reset cleanup
 
 ## Intentionally not implemented yet
 
 - Custom encounter-authored roll dialogs
-- Health / Focus damage
 - Karma or Focus spending
-- Conditions
 - Environmental weapon attacks
 - Knockback/collision
 - Automatic Region creation
@@ -54,7 +53,7 @@ Those are deliberately deferred until this shell is proven stable in your Foundr
 3. Restart Foundry.
 4. Open your Marvel Multiverse world.
 5. Enable **Marvel Encounter Framework** under Manage Modules.
-6. As GM, click the burst icon beside **Settings** in the right sidebar, or open **Settings** and click `Marvel Encounter Framework`.
+6. As GM, click the burst icon beside **Settings** in the right sidebar, use the burst icon in the Token controls, or open **Settings** and click `Marvel Encounter Framework`.
 7. Open the dashboard and activate **City Intersection Crisis**.
 
 You can also open it from the browser console:

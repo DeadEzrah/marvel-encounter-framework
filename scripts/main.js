@@ -106,7 +106,8 @@ function exposeApi() {
 
 function addSettingsButton(application, element) {
   if (!game.user.isGM) return;
-  if (element.querySelector?.("[data-action='openMarvelEncounterDashboard']")) return;
+  const root = element instanceof HTMLElement ? element : element?.[0];
+  if (!root || root.querySelector("[data-action='openMarvelEncounterDashboard']")) return;
 
   const button = document.createElement("button");
   button.type = "button";
@@ -117,11 +118,25 @@ function addSettingsButton(application, element) {
   button.addEventListener("click", () => game.marvelEncounters.openDashboard());
 
   const target =
-    element.querySelector?.(".settings-sidebar") ??
-    element.querySelector?.(".settings") ??
-    element;
+    root.querySelector(".settings-sidebar") ??
+    root.querySelector(".settings") ??
+    root;
 
   target.append(button);
+}
+
+function addSceneControlButton(controls) {
+  if (!game.user.isGM) return;
+  const control = controls.tokens ?? Object.values(controls)[0];
+  if (!control?.tools) return;
+
+  control.tools.marvelEncounters = {
+    name: "marvelEncounters",
+    title: "Marvel Encounters",
+    icon: "fa-solid fa-burst",
+    button: true,
+    onChange: () => game.marvelEncounters?.openDashboard()
+  };
 }
 
 function addSidebarButton(_application, element = document.querySelector("#sidebar")) {
@@ -188,3 +203,4 @@ Hooks.once("ready", async () => {
 Hooks.on("renderSidebar", addSidebarButton);
 Hooks.on("renderSettings", addSettingsButton);
 Hooks.on("renderSettingsConfig", addSettingsButton);
+Hooks.on("getSceneControlButtons", addSceneControlButton);

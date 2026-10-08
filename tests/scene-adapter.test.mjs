@@ -2,10 +2,16 @@ import test from "node:test";
 import assert from "node:assert/strict";
 
 globalThis.game = {
-  settings: { get: () => false }
+  settings: { get: () => false },
+  scenes: []
+};
+globalThis.foundry = {
+  utils: {
+    deepClone: (value) => structuredClone(value)
+  }
 };
 
-const { applySceneArtwork } = await import("../scripts/adapters/foundry-scene-adapter.js");
+const { applySceneArtwork, FoundrySceneAdapter } = await import("../scripts/adapters/foundry-scene-adapter.js");
 
 test("maps legacy scene artwork into a Foundry 14 level", () => {
   const data = {
@@ -70,4 +76,41 @@ test("preserves existing level settings while overriding packaged artwork", () =
   assert.equal(data.levels[0].textures.fit, "contain");
   assert.equal(data.levels[0].textures.rotation, 15);
   assert.deepEqual(data.levels[0].flags, { test: { preserved: true } });
+});
+
+test("refreshes existing encounter artwork through Foundry 14 Scene Levels", async () => {
+  const updates = [];
+  const scene = {
+    name: "City Intersection Crisis",
+    getFlag: () => "city-intersection-crisis",
+    toObject: () => ({
+      initialLevel: "existingLevel001",
+      levels: [{
+        _id: "existingLevel001",
+        name: "Street",
+        background: { src: "old-background.png" },
+        foreground: { src: "old-foreground.png" }
+      }]
+    }),
+    update: async (data) => updates.push(data)
+  };
+  game.scenes = [scene];
+
+  const adapter = new FoundrySceneAdapter();
+  const result = await adapter.ensureEncounterScene({
+    id: "city-intersection-crisis",
+    name: "City Intersection Crisis",
+    scene: {
+      name: "City Intersection Crisis",
+      background: "new-background.png",
+      foreground: "new-foreground.png"
+    }
+  });
+
+  assert.equal(result.created, false);
+  assert.equal(result.updated, true);
+  assert.equal(updates.length, 1);
+  assert.equal(updates[0]["background.src"], undefined);
+  assert.equal(updates[0].levels[0].background.src, "new-background.png");
+  assert.equal(updates[0].levels[0].foreground.src, "new-foreground.png");
 });

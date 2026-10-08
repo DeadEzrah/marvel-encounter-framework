@@ -72,7 +72,17 @@ export class FoundrySceneAdapter {
       scene.getFlag?.(MODULE_ID, "encounterId") === encounter.id
       || scene.name === (descriptor.name ?? encounter.name)
     );
-    if (existing) return { ok: true, scene: existing, created: false };
+    if (existing) {
+      const sceneData = foundry.utils.deepClone(existing.toObject?.() ?? {});
+      applySceneArtwork(sceneData, descriptor);
+      const updates = {
+        [`flags.${MODULE_ID}.encounterId`]: encounter.id,
+        initialLevel: sceneData.initialLevel,
+        levels: sceneData.levels
+      };
+      await existing.update(updates);
+      return { ok: true, scene: existing, created: false, updated: true };
+    }
 
     let sceneData = {};
     const sceneDataUrl = descriptor.sceneData ?? descriptor.sceneFile;
