@@ -18,7 +18,7 @@ const store = new RuntimeStore();
 const marvelAdapter = new MarvelMultiverseAdapter();
 const sceneAdapter = new FoundrySceneAdapter();
 const fxMasterAdapter = new FxMasterAdapter();
-const manager = new EncounterManager({ registry, store, sceneAdapter, marvelAdapter });
+const manager = new EncounterManager({ registry, store, sceneAdapter });
 const resolver = new ActionResolver({ manager, marvelAdapter, sceneAdapter, fxMasterAdapter });
 const triggerEngine = new TriggerEngine({ manager, resolver });
 manager.triggerEngine = triggerEngine;
@@ -101,18 +101,6 @@ function exposeApi() {
       return manager.getDestructibleBindings(options);
     },
 
-    bindBreakableWalls(options) {
-      return manager.bindBreakableWalls(options);
-    },
-
-    destroyBreakableWalls(objectId, options) {
-      return manager.destroyBreakableWalls(objectId, options);
-    },
-
-    repairBreakableWalls(objectId, options) {
-      return manager.repairBreakableWalls(objectId, options);
-    },
-
     get compatibility() {
       return marvelAdapter.compatibility;
     },
@@ -152,87 +140,18 @@ function addSettingsButton(application, element) {
   target.append(button);
 }
 
-async function linkSelectedBreakableWalls() {
-  const targets = Array.from(game.user?.targets ?? []);
-  const selectedWalls = (canvas.walls?.placeables ?? canvas.walls?.objects?.children ?? [])
-    .filter(wall => wall.controlled)
-    .map(wall => wall.document)
-    .filter(Boolean);
-  if (targets.length !== 1) {
-    ui.notifications?.warn("Target exactly one destructible Token before linking Wall segments.");
-    return;
-  }
-  if (!selectedWalls.length) {
-    ui.notifications?.warn("Select at least one Wall segment before linking a breakable wall.");
-    return;
-  }
-
-  const token = targets[0]?.document ?? targets[0];
-  try {
-    const binding = await manager.bindBreakableWalls({
-      sceneId: canvas.scene?.id,
-      tokenId: token.id,
-      wallIds: selectedWalls.map(wall => wall.id)
-    });
-    ui.notifications?.info(
-      `Marvel Encounter Framework: linked ${binding.walls.length} Wall segment(s) to ${token.name}.`
-    );
-  } catch (error) {
-    Logger.error("Breakable Wall linking failed.", error);
-    ui.notifications?.error(`Marvel Encounter Framework: ${error.message}`);
-  }
-}
-
 function addSceneControlButton(controls) {
   if (!game.user.isGM) return;
   const control = controls.tokens ?? Object.values(controls)[0];
-  if (control?.tools) {
-    control.tools.marvelEncounters = {
-      name: "marvelEncounters",
-      title: "Marvel Encounters",
-      icon: "fa-solid fa-burst",
-      button: true,
-      onChange: () => game.marvelEncounters?.openDashboard()
-    };
-  }
+  if (!control?.tools) return;
 
-  const walls = controls.walls;
-  if (walls?.tools) {
-    walls.tools.linkBreakableWall = {
-      name: "linkBreakableWall",
-      title: "Link Breakable Wall",
-      icon: "fa-solid fa-link",
-      button: true,
-      onChange: () => void linkSelectedBreakableWalls()
-    };
-  }
-}
-
-function addBreakableWallHudButton(application, element) {
-  if (!game.user.isGM) return;
-  const root = element instanceof HTMLElement ? element : element?.[0];
-  const token = application.object?.document ?? application.object;
-  const binding = manager.getBreakableWallBindingForToken(token);
-  if (!root || binding?.wallState !== "destroyed") return;
-  const column = root.querySelector(".col.right");
-  if (!column || column.querySelector("[data-action='repairBreakableWall']")) return;
-
-  const button = document.createElement("button");
-  button.type = "button";
-  button.className = "control-icon";
-  button.dataset.action = "repairBreakableWall";
-  button.title = "Repair Breakable Wall";
-  button.setAttribute("aria-label", "Repair Breakable Wall");
-  button.innerHTML = '<i class="fa-solid fa-hammer" aria-hidden="true"></i>';
-  button.addEventListener("click", async () => {
-    const result = await manager.repairBreakableWalls(binding.objectId);
-    if (!result.ok) {
-      ui.notifications?.error(`Marvel Encounter Framework: wall repair failed (${result.reason}).`);
-      return;
-    }
-    application.render({ force: true });
-  });
-  column.append(button);
+  control.tools.marvelEncounters = {
+    name: "marvelEncounters",
+    title: "Marvel Encounters",
+    icon: "fa-solid fa-burst",
+    button: true,
+    onChange: () => game.marvelEncounters?.openDashboard()
+  };
 }
 
 function addSidebarButton(_application, element = document.querySelector("#sidebar")) {
@@ -287,7 +206,7 @@ Hooks.once("ready", async () => {
   }
 
   exposeApi();
-  if (game.user.isGM) {
+  if (game.user.isGM && Object.keys(store.state.destructibleBindings ?? {}).length) {
     await manager.reconcileDestructibleBindings();
   }
   addSidebarButton();
@@ -312,17 +231,6 @@ Hooks.on("renderSidebar", addSidebarButton);
 Hooks.on("renderSettings", addSettingsButton);
 Hooks.on("renderSettingsConfig", addSettingsButton);
 Hooks.on("getSceneControlButtons", addSceneControlButton);
-Hooks.on("renderTokenHUD", addBreakableWallHudButton);
-Hooks.on("updateActor", (actor, changes) => {
-  if (!game.user?.isGM) return;
-  const healthValue = foundry.utils.getProperty?.(changes, "system.health.value")
-    ?? changes?.["system.health.value"];
-  if (Number(healthValue) !== 0) return;
-  void manager.onActorHealthDepleted(actor).catch(error => {
-    Logger.error("Breakable Wall destruction failed.", error);
-    ui.notifications?.error(`Marvel Encounter Framework: ${error.message}`);
-  });
-});
 Hooks.on("preCreateCombatant", combatant => {
   const sceneRef = combatant.sceneId ?? combatant.parent?.scene;
   const scene = game.scenes?.get?.(sceneRef?.id ?? sceneRef) ?? canvas?.scene;

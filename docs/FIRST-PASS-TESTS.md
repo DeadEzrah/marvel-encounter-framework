@@ -23,7 +23,6 @@
 - [ ] Packaged background and foreground artwork load on the Scene's Foundry 14 Level.
 - [ ] Destructible token bindings survive refresh and re-resolve to their Scene tokens.
 - [ ] A deleted destructible token is reported as a missing binding after refresh.
-- [ ] A breakable Wall binding survives refresh through its Token flags.
 
 ## Clocks/phases
 - [ ] Building Integrity 0–3 remains Initial Impact.
@@ -46,13 +45,10 @@
 - [ ] Re-running a destructible spawn action reuses its stable `objectId` binding.
 - [ ] Destructible tokens are unlinked and are excluded from Combat by default.
 - [ ] Ordinary roster Actors retain their existing token-link and reinforcement behavior.
-- [ ] Target one destructible Token, select native Wall segments, and use **Link Breakable Wall**.
-- [ ] Reducing the linked Token Actor to zero Health removes the linked collision/vision Walls.
-- [ ] The Token HUD repair button restores the original Wall IDs and full destructible Health.
 
 ## Marvel boundary
 - [ ] No actor system paths are read or written by the module.
 - [ ] Roll requests call `game.marvelMultiverse.requestRoll`.
 - [ ] Semantic VFX calls `game.marvelMultiverse.playEffect` and remains non-blocking when Sequencer or assets are unavailable.
 - [ ] Calling an unavailable optional rules method returns an explicit compatibility result rather than failing silently.
-- [ ] The module rejects Marvel Multiverse versions older than 3.12.0 and reports a missing public API.
+- [ ] The module rejects Marvel Multiverse versions older than 3.10.0 and reports a missing public API.
