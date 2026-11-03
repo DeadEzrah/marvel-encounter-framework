@@ -2,6 +2,17 @@
 
 ## Unreleased
 
+## [0.8.0] - 2026-11-02
+
+### Added
+- Added GM canvas linking between one targeted Marvel destructible Token and one or more selected native Foundry Wall segments.
+- Added automatic Wall removal when the linked unlinked Token Actor reaches zero Health.
+- Added a Token HUD repair action that restores the original Wall documents and the destructible Actor's full Health through the Marvel public API.
+- Added persistent Token and Wall flags, runtime schema version 3 bindings, public breakable-wall APIs, and focused breach/repair regression coverage.
+
+### Changed
+- Raised the supported Marvel Multiverse system target to 3.12.0 for the public resource-restoration boundary.
+
 ## [0.7.0] - 2026-11-02
 
 ### Added

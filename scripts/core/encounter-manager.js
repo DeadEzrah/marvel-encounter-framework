@@ -2,12 +2,14 @@ import { EVENTS, MODULE_ID, RUNTIME_SCHEMA_VERSION } from "./constants.js";
 import { Logger } from "./logger.js";
 
 export class EncounterManager {
-  constructor({ registry, store, sceneAdapter }) {
+  constructor({ registry, store, sceneAdapter, marvelAdapter }) {
     this.registry = registry;
     this.store = store;
     this.sceneAdapter = sceneAdapter;
+    this.marvelAdapter = marvelAdapter;
     this.triggerEngine = null;
     this.dashboard = null;
+    this.wallMutations = new Set();
   }
 
   get activeEncounter() {
@@ -104,6 +106,20 @@ export class EncounterManager {
     const bindings = this.store.state.destructibleBindings ?? {};
     const missing = [];
 
+    for (const scene of Array.from(game.scenes?.values?.() ?? game.scenes?.contents ?? [])) {
+      for (const token of Array.from(scene.tokens?.values?.() ?? scene.tokens?.contents ?? [])) {
+        const persisted = this.sceneAdapter.getBreakableWallBinding?.(token);
+        if (!persisted?.objectId || bindings[persisted.objectId]) continue;
+        bindings[persisted.objectId] = {
+          ...foundry.utils.deepClone(persisted),
+          sceneId: scene.id,
+          tokenId: token.id,
+          actorId: token.actorId ?? persisted.actorId ?? null,
+          status: "resolved"
+        };
+      }
+    }
+
     for (const binding of Object.values(bindings)) {
       const scene = game.scenes?.get?.(binding.sceneId);
       const tokens = scene?.tokens;
@@ -143,6 +159,188 @@ export class EncounterManager {
     return Object.values(this.store.state.destructibleBindings ?? {})
       .filter(binding => includeMissing || binding.status !== "missing")
       .map(binding => foundry.utils.deepClone(binding));
+  }
+
+  getBreakableWallBindingForToken(token) {
+    const tokenDocument = token?.document ?? token;
+    if (!tokenDocument) return null;
+    const persisted = this.sceneAdapter.getBreakableWallBinding?.(tokenDocument);
+    if (persisted?.objectId) return foundry.utils.deepClone(persisted);
+    const binding = Object.values(this.store.state.destructibleBindings ?? {}).find(candidate =>
+      candidate.tokenId === tokenDocument.id
+      && candidate.sceneId === (tokenDocument.parent?.id ?? tokenDocument.scene?.id)
+      && candidate.walls?.length
+    );
+    return binding ? foundry.utils.deepClone(binding) : null;
+  }
+
+  findBreakableWallBinding(objectId) {
+    const stored = this.store.state.destructibleBindings?.[objectId];
+    if (stored) return stored;
+    for (const scene of Array.from(game.scenes?.values?.() ?? game.scenes?.contents ?? [])) {
+      for (const token of Array.from(scene.tokens?.values?.() ?? scene.tokens?.contents ?? [])) {
+        const persisted = this.sceneAdapter.getBreakableWallBinding?.(token);
+        if (persisted?.objectId !== objectId) continue;
+        const binding = {
+          ...foundry.utils.deepClone(persisted),
+          sceneId: scene.id,
+          tokenId: token.id,
+          actorId: token.actorId ?? persisted.actorId ?? null,
+          status: "resolved"
+        };
+        this.store.state.destructibleBindings ??= {};
+        this.store.state.destructibleBindings[objectId] = binding;
+        return binding;
+      }
+    }
+    return null;
+  }
+
+  async bindBreakableWalls({ sceneId, tokenId, wallIds } = {}) {
+    const scene = game.scenes?.get?.(sceneId);
+    if (!scene) throw new Error(`Scene '${sceneId}' was not found.`);
+    const token = scene.tokens?.get?.(tokenId);
+    if (!token) throw new Error(`Token '${tokenId}' was not found in Scene '${scene.name ?? scene.id}'.`);
+    const destructible = Boolean(
+      token.actor?.getFlag?.("marvel-multiverse", "destructible")
+      ?? token.actor?.flags?.["marvel-multiverse"]?.destructible
+    );
+    if (!destructible) throw new Error(`Token '${token.name ?? token.id}' is not a Marvel destructible Actor.`);
+    const normalizedWallIds = [...new Set((wallIds ?? []).filter(id => typeof id === "string" && id))];
+    if (!normalizedWallIds.length) throw new Error("Select at least one Wall segment to create a breakable wall.");
+
+    const existing = this.getBreakableWallBindingForToken(token);
+    if (existing?.wallState === "destroyed") {
+      throw new Error(`Repair '${token.name ?? token.id}' before changing its Wall binding.`);
+    }
+    const objectId = existing?.objectId
+      ?? token.getFlag?.(MODULE_ID, "objectId")
+      ?? token.flags?.[MODULE_ID]?.objectId
+      ?? `breakable-wall:${scene.id}:${token.id}`;
+    const walls = this.sceneAdapter.resolveWallSnapshots(scene, normalizedWallIds, { objectId });
+    const binding = {
+      version: 2,
+      encounterId: existing?.encounterId ?? this.store.state.activeEncounterId ?? null,
+      objectId,
+      source: existing?.source ?? "wall-link-tool",
+      sceneId: scene.id,
+      tokenId: token.id,
+      actorId: token.actorId ?? token.actor?.id ?? null,
+      rosterId: existing?.rosterId
+        ?? token.getFlag?.(MODULE_ID, "rosterId")
+        ?? token.flags?.[MODULE_ID]?.rosterId
+        ?? null,
+      sourceActorUuid: existing?.sourceActorUuid
+        ?? token.getFlag?.(MODULE_ID, "sourceUuid")
+        ?? token.flags?.[MODULE_ID]?.sourceUuid
+        ?? token.actor?.uuid
+        ?? null,
+      status: "resolved",
+      walls,
+      wallState: "intact",
+      destroyedAt: null
+    };
+
+    await this.sceneAdapter.persistBreakableWallBinding(binding);
+    if (existing?.walls?.length) {
+      await this.sceneAdapter.releaseBreakableWallFlags(existing, {
+        exceptIds: walls.map(wall => wall.id)
+      });
+    }
+    this.store.state.destructibleBindings ??= {};
+    this.store.state.destructibleBindings[objectId] = binding;
+    this.store.pushHistory(EVENTS.BREAKABLE_WALL_BOUND, {
+      objectId,
+      sceneId: scene.id,
+      tokenId: token.id,
+      wallIds: walls.map(wall => wall.id)
+    });
+    await this.store.save();
+    return foundry.utils.deepClone(binding);
+  }
+
+  async destroyBreakableWalls(objectId, { notify = true } = {}) {
+    const binding = this.findBreakableWallBinding(objectId);
+    if (!binding?.walls?.length) return { ok: false, reason: "binding-missing", objectId };
+    if (binding.wallState === "destroyed") {
+      return { ok: true, alreadyDestroyed: true, binding: foundry.utils.deepClone(binding) };
+    }
+    if (this.wallMutations.has(objectId)) return { ok: false, reason: "mutation-in-progress", objectId };
+
+    this.wallMutations.add(objectId);
+    try {
+      const result = await this.sceneAdapter.removeBreakableWalls(binding);
+      binding.wallState = "destroyed";
+      binding.destroyedAt = new Date().toISOString();
+      await this.sceneAdapter.persistBreakableWallBinding(binding);
+      this.store.pushHistory(EVENTS.BREAKABLE_WALL_DESTROYED, {
+        objectId,
+        wallIds: result.removedWallIds
+      });
+      await this.store.save();
+      if (notify) {
+        ui.notifications?.info(
+          `Marvel Encounter Framework: ${result.removedWallIds.length} Wall segment(s) breached.`
+        );
+      }
+      return { ok: true, binding: foundry.utils.deepClone(binding), ...result };
+    } finally {
+      this.wallMutations.delete(objectId);
+    }
+  }
+
+  async repairBreakableWalls(objectId, { notify = true } = {}) {
+    const binding = this.findBreakableWallBinding(objectId);
+    if (!binding?.walls?.length) return { ok: false, reason: "binding-missing", objectId };
+    if (this.wallMutations.has(objectId)) return { ok: false, reason: "mutation-in-progress", objectId };
+
+    this.wallMutations.add(objectId);
+    try {
+      const token = this.sceneAdapter.getBoundToken(binding);
+      if (!token?.actor) return { ok: false, reason: "token-missing", objectId };
+      const restored = await this.marvelAdapter?.restoreHealth(token.actor);
+      if (!restored?.success) {
+        return {
+          ok: false,
+          reason: restored?.reason ?? "restore-unavailable",
+          objectId,
+          restore: restored
+        };
+      }
+
+      const result = await this.sceneAdapter.restoreBreakableWalls(binding);
+      binding.wallState = "intact";
+      binding.destroyedAt = null;
+      binding.status = "resolved";
+      await this.sceneAdapter.persistBreakableWallBinding(binding);
+      this.store.pushHistory(EVENTS.BREAKABLE_WALL_REPAIRED, {
+        objectId,
+        wallIds: binding.walls.map(wall => wall.id)
+      });
+      await this.store.save();
+      if (notify) {
+        ui.notifications?.info(
+          `Marvel Encounter Framework: ${binding.walls.length} Wall segment(s) repaired.`
+        );
+      }
+      return { ok: true, binding: foundry.utils.deepClone(binding), restore: restored, ...result };
+    } finally {
+      this.wallMutations.delete(objectId);
+    }
+  }
+
+  async onActorHealthDepleted(actor) {
+    const token = actor?.token?.document
+      ?? actor?.token
+      ?? (actor?.parent?.documentName === "Token" ? actor.parent : null);
+    const binding = this.getBreakableWallBindingForToken(token);
+    if (!binding?.objectId || binding.wallState === "destroyed") return null;
+    this.store.state.destructibleBindings ??= {};
+    this.store.state.destructibleBindings[binding.objectId] = {
+      ...(this.store.state.destructibleBindings[binding.objectId] ?? {}),
+      ...binding
+    };
+    return this.destroyBreakableWalls(binding.objectId);
   }
 
   async reset() {

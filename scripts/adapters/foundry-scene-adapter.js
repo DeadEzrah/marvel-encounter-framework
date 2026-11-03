@@ -182,19 +182,28 @@ export class FoundrySceneAdapter {
           `Actor UUID '${rosterEntry.uuid}' for encounter actor '${rosterEntry.id}' did not resolve to an Actor.`
         );
       }
-      resolved.push({ actor, placement, placementIndex, rosterEntry });
+      const destructible = Boolean(
+        actor.getFlag?.("marvel-multiverse", "destructible")
+        ?? actor.flags?.["marvel-multiverse"]?.destructible
+      );
+      const wallIds = Array.isArray(placement.wallIds)
+        ? [...new Set(placement.wallIds.filter(id => typeof id === "string" && id))]
+        : [];
+      if (wallIds.length && !destructible) {
+        throw new Error(`Encounter actor '${rosterEntry.id}' must be destructible before it can bind Wall segments.`);
+      }
+      if (wallIds.length && Math.max(1, Number(placement.count ?? 1)) !== 1) {
+        throw new Error(`Destructible placement '${placement.objectId ?? placement.id ?? rosterEntry.id}' cannot combine wallIds with count greater than one.`);
+      }
+      resolved.push({ actor, destructible, placement, placementIndex, rosterEntry, wallIds });
     }
 
     const tokenData = [];
     const pendingBindings = [];
     const reusedBindings = [];
     const missingBindings = [];
-    for (const { actor, placement, placementIndex, rosterEntry } of resolved) {
+    for (const { actor, destructible, placement, placementIndex, rosterEntry, wallIds } of resolved) {
       const spawnActor = await this.#ensureWorldActor(actor, encounter, rosterEntry);
-      const destructible = Boolean(
-        actor.getFlag?.("marvel-multiverse", "destructible")
-        ?? actor.flags?.["marvel-multiverse"]?.destructible
-      );
 
       const count = Math.max(1, Number(placement.count ?? 1));
       for (let index = 0; index < count; index++) {
@@ -202,16 +211,20 @@ export class FoundrySceneAdapter {
         const objectBase = placement.objectId ?? placement.id
           ?? `${source}:${rosterEntry.id}:${placementIndex}`;
         const objectId = count > 1 ? `${objectBase}:${index}` : objectBase;
+        const existingBinding = destructible ? bindings[objectId] : null;
+        const walls = existingBinding?.walls
+          ?? (wallIds.length ? this.resolveWallSnapshots(scene, wallIds, { objectId }) : []);
 
         if (destructible) {
-          const existingBinding = bindings[objectId];
           const existingToken = this.#findBoundToken(scene, existingBinding, objectId);
           if (existingToken) {
             reusedBindings.push(this.#createBinding({
               encounter, scene, rosterEntry, spawnActor, source, objectId,
               tokenId: existingToken.id,
               actorId: existingToken.actorId ?? spawnActor.id,
-              sourceUuid: actor.uuid ?? rosterEntry.uuid
+              sourceUuid: actor.uuid ?? rosterEntry.uuid,
+              walls: existingBinding.walls ?? walls,
+              wallState: existingBinding.wallState
             }));
             continue;
           }
@@ -236,6 +249,7 @@ export class FoundrySceneAdapter {
                 objectId,
                 sourceUuid: actor.uuid ?? rosterEntry.uuid,
                 destructible: true,
+                wallIds: walls.map(wall => wall.id),
                 includeInCombat: placement.includeInCombat === true
               } : {})
             }
@@ -247,7 +261,8 @@ export class FoundrySceneAdapter {
         pendingBindings.push(destructible ? {
           encounter, scene, rosterEntry, spawnActor, source, objectId,
           actorId: data.actorId ?? spawnActor.id,
-          sourceUuid: actor.uuid ?? rosterEntry.uuid
+          sourceUuid: actor.uuid ?? rosterEntry.uuid,
+          walls
         } : null);
       }
     }
@@ -264,6 +279,9 @@ export class FoundrySceneAdapter {
         tokenId: tokens[index].id,
         actorId: tokens[index].actorId ?? pending.actorId
       }));
+    }
+    for (const binding of [...reusedBindings, ...createdBindings]) {
+      if (binding.walls?.length) await this.persistBreakableWallBinding(binding);
     }
 
     return {
@@ -285,11 +303,135 @@ export class FoundrySceneAdapter {
       ?? null;
   }
 
+  resolveWallSnapshots(scene, wallIds, { objectId = null } = {}) {
+    const walls = [];
+    for (const wallId of wallIds) {
+      const wall = scene.walls?.get?.(wallId);
+      if (!wall) throw new Error(`Wall '${wallId}' was not found in Scene '${scene.name ?? scene.id}'.`);
+      const linkedObjectId = wall.getFlag?.(MODULE_ID, "breakableObjectId")
+        ?? wall.flags?.[MODULE_ID]?.breakableObjectId;
+      if (linkedObjectId && linkedObjectId !== objectId) {
+        throw new Error(`Wall '${wallId}' is already linked to destructible object '${linkedObjectId}'.`);
+      }
+      walls.push({
+        id: wall.id,
+        data: foundry.utils.deepClone(wall.toObject?.() ?? wall)
+      });
+    }
+    return walls;
+  }
+
+  getBoundToken(binding) {
+    const scene = game.scenes?.get?.(binding?.sceneId);
+    return scene?.tokens?.get?.(binding?.tokenId) ?? null;
+  }
+
+  getBreakableWallBinding(token) {
+    return token?.getFlag?.(MODULE_ID, "breakableWall")
+      ?? token?.flags?.[MODULE_ID]?.breakableWall
+      ?? null;
+  }
+
+  async persistBreakableWallBinding(binding) {
+    const scene = game.scenes?.get?.(binding.sceneId);
+    const token = scene?.tokens?.get?.(binding.tokenId);
+    if (!scene || !token) throw new Error(`Cannot persist breakable wall binding '${binding.objectId}' without its Scene token.`);
+
+    const stored = foundry.utils.deepClone(binding);
+    if (typeof token.update === "function") {
+      await token.update({
+        [`flags.${MODULE_ID}.objectId`]: binding.objectId,
+        [`flags.${MODULE_ID}.destructible`]: true,
+        [`flags.${MODULE_ID}.includeInCombat`]: false,
+        [`flags.${MODULE_ID}.wallIds`]: binding.walls.map(wall => wall.id),
+        [`flags.${MODULE_ID}.breakableWall`]: stored
+      });
+    } else {
+      token.flags ??= {};
+      token.flags[MODULE_ID] = {
+        ...(token.flags[MODULE_ID] ?? {}),
+        objectId: binding.objectId,
+        destructible: true,
+        includeInCombat: false,
+        wallIds: binding.walls.map(wall => wall.id),
+        breakableWall: stored
+      };
+    }
+
+    const wallUpdates = binding.wallState === "destroyed"
+      ? []
+      : binding.walls
+        .filter(wall => scene.walls?.get?.(wall.id))
+        .map(wall => ({
+          _id: wall.id,
+          [`flags.${MODULE_ID}.breakableObjectId`]: binding.objectId,
+          [`flags.${MODULE_ID}.breakableTokenId`]: binding.tokenId
+        }));
+    if (wallUpdates.length && typeof scene.updateEmbeddedDocuments === "function") {
+      await scene.updateEmbeddedDocuments("Wall", wallUpdates);
+    }
+    return stored;
+  }
+
+  async releaseBreakableWallFlags(binding, { exceptIds = [] } = {}) {
+    const scene = game.scenes?.get?.(binding?.sceneId);
+    if (!scene || typeof scene.updateEmbeddedDocuments !== "function") return [];
+    const retained = new Set(exceptIds);
+    const wallIds = (binding.walls ?? [])
+      .map(wall => wall.id)
+      .filter(id => !retained.has(id) && scene.walls?.get?.(id));
+    if (!wallIds.length) return [];
+    await scene.updateEmbeddedDocuments("Wall", wallIds.map(id => ({
+      _id: id,
+      [`flags.${MODULE_ID}.breakableObjectId`]: null,
+      [`flags.${MODULE_ID}.breakableTokenId`]: null
+    })));
+    return wallIds;
+  }
+
+  async removeBreakableWalls(binding) {
+    const scene = game.scenes?.get?.(binding.sceneId);
+    if (!scene) throw new Error(`Scene '${binding.sceneId}' for breakable wall '${binding.objectId}' was not found.`);
+    const wallIds = binding.walls
+      .map(wall => wall.id)
+      .filter(id => scene.walls?.get?.(id));
+    if (wallIds.length) await scene.deleteEmbeddedDocuments("Wall", wallIds);
+    return {
+      removedWallIds: wallIds,
+      missingWallIds: binding.walls.map(wall => wall.id).filter(id => !wallIds.includes(id))
+    };
+  }
+
+  async restoreBreakableWalls(binding) {
+    const scene = game.scenes?.get?.(binding.sceneId);
+    if (!scene) throw new Error(`Scene '${binding.sceneId}' for breakable wall '${binding.objectId}' was not found.`);
+    const missing = binding.walls.filter(wall => !scene.walls?.get?.(wall.id));
+    const wallData = missing.map(wall => {
+      const data = foundry.utils.deepClone(wall.data);
+      data._id = wall.id;
+      data.flags ??= {};
+      data.flags[MODULE_ID] = {
+        ...(data.flags[MODULE_ID] ?? {}),
+        breakableObjectId: binding.objectId,
+        breakableTokenId: binding.tokenId
+      };
+      return data;
+    });
+    const created = wallData.length
+      ? await scene.createEmbeddedDocuments("Wall", wallData, { keepId: true })
+      : [];
+    return {
+      restoredWallIds: created.map(wall => wall.id),
+      existingWallIds: binding.walls.map(wall => wall.id).filter(id => scene.walls?.get?.(id))
+    };
+  }
+
   #createBinding({
-    encounter, scene, rosterEntry, spawnActor, source, objectId, tokenId, actorId, sourceUuid
+    encounter, scene, rosterEntry, spawnActor, source, objectId, tokenId, actorId, sourceUuid,
+    walls = [], wallState
   }) {
     return {
-      version: 1,
+      version: walls.length ? 2 : 1,
       encounterId: encounter.id,
       objectId,
       source,
@@ -298,7 +440,12 @@ export class FoundrySceneAdapter {
       actorId: actorId ?? spawnActor.id ?? null,
       rosterId: rosterEntry.id,
       sourceActorUuid: sourceUuid,
-      status: "resolved"
+      status: "resolved",
+      ...(walls.length ? {
+        walls: foundry.utils.deepClone(walls),
+        wallState: wallState ?? "intact",
+        destroyedAt: null
+      } : {})
     };
   }
 

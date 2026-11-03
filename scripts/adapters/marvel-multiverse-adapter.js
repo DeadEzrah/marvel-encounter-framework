@@ -19,6 +19,7 @@ export class MarvelMultiverseAdapter {
       requestRoll: typeof this.api?.requestRoll === "function",
       playEffect: typeof this.api?.playEffect === "function",
       applyDamage: typeof this.api?.applyDamage === "function",
+      restoreResource: typeof this.api?.restoreResource === "function",
       applyStatus: typeof this.api?.applyStatus === "function",
       resolveEnvironmentalAttack: typeof this.api?.resolveEnvironmentalAttack === "function",
       resolveCollision: typeof this.api?.resolveCollision === "function"
@@ -56,6 +57,11 @@ export class MarvelMultiverseAdapter {
   async applyFocusDamage(actor, amount, options = {}) {
     if (!this.capabilities.applyDamage) return this.#unavailable("applyDamage");
     return this.api.applyDamage({ actor, kind: "focus", amount, ...options });
+  }
+
+  async restoreHealth(actor, options = {}) {
+    if (!this.capabilities.restoreResource) return this.#unavailable("restoreResource");
+    return this.api.restoreResource({ actor, kind: "health", ...options });
   }
 
   async applyStatus(actor, statusId, options = {}) {

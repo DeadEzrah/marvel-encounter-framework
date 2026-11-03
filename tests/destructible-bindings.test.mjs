@@ -152,7 +152,7 @@ test("creates independent destructible tokens and persists stable bindings", asy
 
   const reloaded = new RuntimeStore();
   await reloaded.load();
-  assert.equal(reloaded.state.schemaVersion, 2);
+  assert.equal(reloaded.state.schemaVersion, 3);
   assert.equal(reloaded.state.destructibleBindings["taxi-a:0"].tokenId, token.id);
 });
 
@@ -224,7 +224,7 @@ test("ordinary roster actors keep their existing linked-token behavior", async (
   assert.equal(isDestructibleTokenCombatEligible(token), true);
 });
 
-test("enforces the Marvel Multiverse 3.10.0 system API compatibility floor", () => {
+test("enforces the Marvel Multiverse 3.12.0 system API compatibility floor", () => {
   const adapter = new MarvelMultiverseAdapter();
   game.system = { id: "marvel-multiverse", version: "3.9.9" };
   game.marvelMultiverse = {};
@@ -232,10 +232,10 @@ test("enforces the Marvel Multiverse 3.10.0 system API compatibility floor", () 
     ok: false,
     reason: "unsupported-version",
     version: "3.9.9",
-    minimumVersion: "3.10.0"
+    minimumVersion: "3.12.0"
   });
 
-  game.system.version = "3.10.0";
+  game.system.version = "3.12.0";
   assert.equal(adapter.compatibility.ok, true);
   delete game.marvelMultiverse;
   assert.equal(adapter.compatibility.reason, "api-unavailable");

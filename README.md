@@ -1,8 +1,8 @@
 # Marvel Encounter Framework — First Pass
 
 **Target:** Foundry VTT 14.365  
-**System:** Marvel Multiverse 3.10.0 or newer
-**Module version:** 0.7.0
+**System:** Marvel Multiverse 3.12.0 or newer
+**Module version:** 0.8.0
 
 This is the installable vertical-slice build of the Marvel Encounter Framework.
 
@@ -26,6 +26,8 @@ This is the installable vertical-slice build of the Marvel Encounter Framework.
 - Actor rosters backed by compendium UUIDs
 - One-time round, phase, or clock-triggered reinforcement spawning
 - Persistent bindings for unlinked Marvel Multiverse destructible Actor tokens
+- Native Foundry Wall segments linked to targetable destructible Tokens
+- Automatic zero-Health Wall breaching and GM repair from the Token HUD
 - Marvel Multiverse public API adapter
 - Health damage, Focus damage, and actor status actions through the system's public mutation API
 - Semantic VFX routed through the system's JB2A/Sequencer effect library
@@ -38,8 +40,8 @@ This is the installable vertical-slice build of the Marvel Encounter Framework.
 - Environmental weapon attacks
 - Knockback/collision
 - Automatic Region creation
-- Destructible object state swapping
-- Destruction triggers and a destructible-object dashboard
+- Non-wall destructible object state swapping
+- A general destructible-object dashboard
 - Scene/background phase swaps
 - Encounter package importer UI
 
@@ -104,6 +106,12 @@ await game.marvelEncounters.incrementClock("building-collapse", 1);
 await game.marvelEncounters.updateObjective("rescue-civilians", { value: 3 });
 await game.marvelEncounters.advancePhase();
 await game.marvelEncounters.reconcileDestructibleBindings();
+await game.marvelEncounters.bindBreakableWalls({
+  sceneId: canvas.scene.id,
+  tokenId: token.id,
+  wallIds: ["wall-id"]
+});
+await game.marvelEncounters.repairBreakableWalls("object-id");
 await game.marvelEncounters.reset();
 
 game.marvelEncounters.activeEncounter;
@@ -187,7 +195,7 @@ until it is deliberately replaced outside this bounded integration.
 ```
 
 Each destructible token receives framework-owned `encounterId`, `objectId`,
-`rosterId`, `source`, and `sourceUuid` flags. Runtime schema version 2 stores
+`rosterId`, `source`, and `sourceUuid` flags. Runtime schema version 3 stores
 plain binding data keyed by `objectId`:
 
 ```js
@@ -207,6 +215,45 @@ plain binding data keyed by `objectId`:
 
 Destructibles are excluded from Combat by default. `includeInCombat: true` is
 an explicit escape hatch, not the default encounter-object behavior.
+
+## Breakable Walls
+
+Breakable Walls keep Foundry collision, sight, light, and sound blocking on
+native Wall documents while a visible Marvel destructible Token owns Health
+and Damage Reduction.
+
+GM setup uses normal canvas controls:
+
+1. Drag a wall or door profile from the Marvel destructibles compendium.
+2. Target that Token.
+3. Switch to Wall controls and select one or more Wall segments.
+4. Click **Link Breakable Wall**.
+
+Players target and damage the destructible Token normally. When its Health
+reaches zero, the linked Wall segments are removed. The zero-Health Token
+remains as the destroyed object; a GM can open its Token HUD and click
+**Repair Breakable Wall** to restore full Health and recreate the original
+Walls with their prior IDs and configuration.
+
+Encounter-authored placements can establish the same link with `wallIds`:
+
+```json
+{
+  "type": "spawn-actors",
+  "id": "breachable-walls",
+  "actors": [{
+    "actor": "brick-wall",
+    "objectId": "warehouse-east-wall",
+    "wallIds": ["east-wall-a", "east-wall-b"],
+    "x": 1800,
+    "y": 900
+  }]
+}
+```
+
+One placement with `wallIds` represents one destructible object; it cannot
+also use `count` greater than one. Binding snapshots are stored on the Token
+as well as in runtime state so wall repair remains available after reload.
 
 FXMaster effects can provide a free-tier payload and an FXMaster+ payload. The framework selects the Plus payload when available and otherwise uses the core fallback:
 

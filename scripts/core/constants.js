@@ -1,7 +1,7 @@
 export const MODULE_ID = "marvel-encounter-framework";
 export const MODULE_TITLE = "Marvel Encounter Framework";
-export const RUNTIME_SCHEMA_VERSION = 2;
-export const MINIMUM_MARVEL_VERSION = "3.10.0";
+export const RUNTIME_SCHEMA_VERSION = 3;
+export const MINIMUM_MARVEL_VERSION = "3.12.0";
 
 export const SETTINGS = Object.freeze({
   RUNTIME_STATE: "runtimeState",
@@ -15,7 +15,10 @@ export const EVENTS = Object.freeze({
   ROUND_END: "combat.roundEnd",
   CLOCK_CHANGED: "clock.changed",
   OBJECTIVE_CHANGED: "objective.changed",
-  PHASE_CHANGED: "phase.changed"
+  PHASE_CHANGED: "phase.changed",
+  BREAKABLE_WALL_BOUND: "breakableWall.bound",
+  BREAKABLE_WALL_DESTROYED: "breakableWall.destroyed",
+  BREAKABLE_WALL_REPAIRED: "breakableWall.repaired"
 });
 
 export const ACTION_TYPES = Object.freeze({
