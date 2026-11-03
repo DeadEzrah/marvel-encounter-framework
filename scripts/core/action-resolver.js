@@ -65,7 +65,7 @@ export class ActionResolver {
         }), action.type);
 
       case ACTION_TYPES.SPAWN_ACTORS:
-        return this.scene.spawnActors(this.manager.activeEncounter, action, context);
+        return this.manager.spawnActors(action, context);
 
       case ACTION_TYPES.REQUEST_ROLL:
         return this.marvel.requestRoll(action);

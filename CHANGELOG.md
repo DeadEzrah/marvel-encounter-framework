@@ -1,5 +1,17 @@
 # Changelog
 
+## Unreleased
+
+## [0.7.0] - 2026-11-02
+
+### Added
+- Added versioned runtime bindings for unlinked Marvel Multiverse destructible Actor tokens, including reload reconciliation and a public read-only query.
+- Added stable encounter object flags and duplicate-safe roster spawning with clear missing-token reports.
+
+### Changed
+- Raised the supported Marvel Multiverse system target to 3.10.0 and added runtime system/API compatibility reporting.
+- Destructible encounter objects are excluded from Combat by default.
+
 All notable changes to the Marvel Encounter Framework should be documented in this file.
 
 ## [0.6.2] - 2026-10-08
@@ -21,7 +33,7 @@ All notable changes to the Marvel Encounter Framework should be documented in th
 
 ### Changed
 - Existing encounter scenes now refresh packaged background and foreground artwork while preserving their level configuration.
-- Verified Health damage, Focus damage, and status actions against the Marvel Multiverse 3.2.0 public mutation API.
+- Verified Health damage, Focus damage, and status actions against the Marvel Multiverse 3.10.0 public mutation API.
 
 ### Fixed
 - Settings launchers now handle both native elements and legacy element wrappers.

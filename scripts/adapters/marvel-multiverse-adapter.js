@@ -1,4 +1,5 @@
 import { Logger } from "../core/logger.js";
+import { MINIMUM_MARVEL_VERSION } from "../core/constants.js";
 
 export class MarvelMultiverseAdapter {
   get systemReady() {
@@ -22,6 +23,24 @@ export class MarvelMultiverseAdapter {
       resolveEnvironmentalAttack: typeof this.api?.resolveEnvironmentalAttack === "function",
       resolveCollision: typeof this.api?.resolveCollision === "function"
     };
+  }
+
+  get compatibility() {
+    if (!this.systemReady) {
+      return { ok: false, reason: "wrong-system", requiredSystem: "marvel-multiverse" };
+    }
+    if (!this.version || this.#compareVersions(this.version, MINIMUM_MARVEL_VERSION) < 0) {
+      return {
+        ok: false,
+        reason: "unsupported-version",
+        version: this.version,
+        minimumVersion: MINIMUM_MARVEL_VERSION
+      };
+    }
+    if (!this.api) {
+      return { ok: false, reason: "api-unavailable", version: this.version };
+    }
+    return { ok: true, version: this.version, minimumVersion: MINIMUM_MARVEL_VERSION };
   }
 
   async requestRoll(request) {
@@ -74,6 +93,17 @@ export class MarvelMultiverseAdapter {
       };
     }
     return null;
+  }
+
+  #compareVersions(left, right) {
+    const a = String(left).split(/[.-]/).map(part => Number.parseInt(part, 10) || 0);
+    const b = String(right).split(/[.-]/).map(part => Number.parseInt(part, 10) || 0);
+    for (let index = 0; index < Math.max(a.length, b.length); index++) {
+      if ((a[index] ?? 0) !== (b[index] ?? 0)) {
+        return (a[index] ?? 0) > (b[index] ?? 0) ? 1 : -1;
+      }
+    }
+    return 0;
   }
 
   #unavailable(method, { notify = true } = {}) {

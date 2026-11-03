@@ -1,8 +1,8 @@
 # Marvel Encounter Framework — First Pass
 
 **Target:** Foundry VTT 14.365  
-**System:** Marvel Multiverse 3.2.0
-**Module version:** 0.6.0
+**System:** Marvel Multiverse 3.10.0 or newer
+**Module version:** 0.7.0
 
 This is the installable vertical-slice build of the Marvel Encounter Framework.
 
@@ -25,6 +25,7 @@ This is the installable vertical-slice build of the Marvel Encounter Framework.
 - Scene creation and binding from encounter-pack exports
 - Actor rosters backed by compendium UUIDs
 - One-time round, phase, or clock-triggered reinforcement spawning
+- Persistent bindings for unlinked Marvel Multiverse destructible Actor tokens
 - Marvel Multiverse public API adapter
 - Health damage, Focus damage, and actor status actions through the system's public mutation API
 - Semantic VFX routed through the system's JB2A/Sequencer effect library
@@ -38,6 +39,7 @@ This is the installable vertical-slice build of the Marvel Encounter Framework.
 - Knockback/collision
 - Automatic Region creation
 - Destructible object state swapping
+- Destruction triggers and a destructible-object dashboard
 - Scene/background phase swaps
 - Encounter package importer UI
 
@@ -101,10 +103,13 @@ await game.marvelEncounters.activate("city-intersection-crisis");
 await game.marvelEncounters.incrementClock("building-collapse", 1);
 await game.marvelEncounters.updateObjective("rescue-civilians", { value: 3 });
 await game.marvelEncounters.advancePhase();
+await game.marvelEncounters.reconcileDestructibleBindings();
 await game.marvelEncounters.reset();
 
 game.marvelEncounters.activeEncounter;
 game.marvelEncounters.state;
+game.marvelEncounters.getDestructibleBindings();
+game.marvelEncounters.compatibility;
 ```
 
 You can register additional encounter data at runtime:
@@ -161,6 +166,48 @@ Then spawn them from any phase or trigger:
 }
 ```
 
+Roster Actors carrying `flags.marvel-multiverse.destructible` are spawned as
+unlinked tokens. Give each placement a stable `objectId`; for `count` greater
+than one the framework appends a zero-based instance suffix. Re-running the
+same action reuses a token with that object binding instead of silently
+creating another. A missing persisted token is reported and remains missing
+until it is deliberately replaced outside this bounded integration.
+
+```json
+{
+  "type": "spawn-actors",
+  "id": "street-objects",
+  "actors": [{
+    "actor": "taxi",
+    "objectId": "taxi-at-fifth",
+    "x": 1400,
+    "y": 900
+  }]
+}
+```
+
+Each destructible token receives framework-owned `encounterId`, `objectId`,
+`rosterId`, `source`, and `sourceUuid` flags. Runtime schema version 2 stores
+plain binding data keyed by `objectId`:
+
+```js
+{
+  version: 1,
+  encounterId: "city-intersection-crisis",
+  objectId: "taxi-at-fifth",
+  source: "street-objects",
+  sceneId: "scene-id",
+  tokenId: "token-id",
+  actorId: "imported-world-actor-id",
+  rosterId: "taxi",
+  sourceActorUuid: "Compendium.marvel-multiverse.destructibles.Actor.taxi",
+  status: "resolved" // or "missing"
+}
+```
+
+Destructibles are excluded from Combat by default. `includeInCombat: true` is
+an explicit escape hatch, not the default encounter-object behavior.
+
 FXMaster effects can provide a free-tier payload and an FXMaster+ payload. The framework selects the Plus payload when available and otherwise uses the core fallback:
 
 ```json
@@ -206,6 +253,6 @@ Once this runs cleanly in the live world:
 
 1. Connect Region enable/disable and Region event routing.
 2. Define the first supported Marvel system API calls.
-3. Add destructible environmental objects.
+3. Add the larger destructible objects schema, destruction triggers, and dashboard.
 4. Add semantic VFX registry.
 5. Add encounter package import/export tooling.

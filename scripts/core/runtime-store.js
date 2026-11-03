@@ -1,4 +1,4 @@
-import { MODULE_ID, SETTINGS } from "./constants.js";
+import { MODULE_ID, RUNTIME_SCHEMA_VERSION, SETTINGS } from "./constants.js";
 import { Logger } from "./logger.js";
 
 export class RuntimeStore {
@@ -8,7 +8,7 @@ export class RuntimeStore {
 
   #emptyState() {
     return {
-      schemaVersion: 1,
+      schemaVersion: RUNTIME_SCHEMA_VERSION,
       activeEncounterId: null,
       sceneId: null,
       phaseId: null,
@@ -16,6 +16,7 @@ export class RuntimeStore {
       objectives: {},
       firedTriggers: [],
       fxmasterEffects: {},
+      destructibleBindings: {},
       lastCombatRound: null,
       history: []
     };
@@ -27,6 +28,7 @@ export class RuntimeStore {
       inplace: false,
       recursive: true
     });
+    this.state.schemaVersion = RUNTIME_SCHEMA_VERSION;
     Logger.debug("Runtime state loaded", this.state);
     return this.state;
   }

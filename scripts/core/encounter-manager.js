@@ -1,4 +1,4 @@
-import { EVENTS } from "./constants.js";
+import { EVENTS, MODULE_ID, RUNTIME_SCHEMA_VERSION } from "./constants.js";
 import { Logger } from "./logger.js";
 
 export class EncounterManager {
@@ -29,13 +29,17 @@ export class EncounterManager {
     const phase = [...(encounter.phases ?? [])].sort((a, b) => (a.order ?? 0) - (b.order ?? 0))[0] ?? null;
 
     const next = {
-      schemaVersion: 1,
+      schemaVersion: RUNTIME_SCHEMA_VERSION,
       activeEncounterId: encounter.id,
       sceneId: sceneResult?.scene?.id ?? null,
       phaseId: phase?.id ?? null,
       clocks: {},
       objectives: {},
       firedTriggers: [],
+      fxmasterEffects: {},
+      destructibleBindings: this.store.state.activeEncounterId === encounter.id
+        ? foundry.utils.deepClone(this.store.state.destructibleBindings ?? {})
+        : {},
       lastCombatRound: game.combat?.round ?? null,
       history: []
     };
@@ -66,6 +70,9 @@ export class EncounterManager {
     await this.store.replace(next);
     this.store.pushHistory(EVENTS.ENCOUNTER_ACTIVATED, { encounterId });
     await this.store.save();
+    if (Object.keys(next.destructibleBindings).length) {
+      await this.reconcileDestructibleBindings();
+    }
 
     if (phase?.onEnter?.length) {
       await this.triggerEngine?.resolver.executeMany(phase.onEnter, { source: `phase:${phase.id}:enter` });
@@ -75,6 +82,67 @@ export class EncounterManager {
     this.renderDashboard();
     ui.notifications?.info(`Marvel Encounter Framework: Activated ${encounter.name}`);
     return this.store.state;
+  }
+
+  async spawnActors(action, context = {}) {
+    const encounter = this.activeEncounter;
+    if (!encounter) throw new Error("Cannot spawn actors without an active encounter.");
+
+    const result = await this.sceneAdapter.spawnActors(encounter, action, context, {
+      bindings: this.store.state.destructibleBindings ?? {}
+    });
+
+    this.store.state.destructibleBindings ??= {};
+    for (const binding of result.bindings ?? []) {
+      this.store.state.destructibleBindings[binding.objectId] = binding;
+    }
+    if ((result.bindings?.length ?? 0) > 0) await this.store.save();
+    return result;
+  }
+
+  async reconcileDestructibleBindings({ notify = true } = {}) {
+    const bindings = this.store.state.destructibleBindings ?? {};
+    const missing = [];
+
+    for (const binding of Object.values(bindings)) {
+      const scene = game.scenes?.get?.(binding.sceneId);
+      const tokens = scene?.tokens;
+      let token = tokens?.get?.(binding.tokenId)
+        ?? tokens?.find?.(candidate =>
+          candidate.getFlag?.(MODULE_ID, "objectId") === binding.objectId
+          || candidate.flags?.[MODULE_ID]?.objectId === binding.objectId
+        );
+
+      if (token) {
+        binding.tokenId = token.id;
+        binding.actorId = token.actorId ?? binding.actorId ?? null;
+        binding.status = "resolved";
+      } else {
+        binding.status = "missing";
+        missing.push(foundry.utils.deepClone(binding));
+      }
+    }
+
+    await this.store.save();
+    if (missing.length) {
+      Logger.warn("Destructible encounter tokens are missing.", missing);
+      if (notify) {
+        ui.notifications?.warn(
+          `Marvel Encounter Framework: ${missing.length} destructible token binding(s) could not be resolved.`
+        );
+      }
+    }
+    return {
+      ok: missing.length === 0,
+      bindings: this.getDestructibleBindings(),
+      missing
+    };
+  }
+
+  getDestructibleBindings({ includeMissing = true } = {}) {
+    return Object.values(this.store.state.destructibleBindings ?? {})
+      .filter(binding => includeMissing || binding.status !== "missing")
+      .map(binding => foundry.utils.deepClone(binding));
   }
 
   async reset() {

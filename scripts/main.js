@@ -6,7 +6,10 @@ import { EncounterManager } from "./core/encounter-manager.js";
 import { ActionResolver } from "./core/action-resolver.js";
 import { TriggerEngine } from "./core/trigger-engine.js";
 import { MarvelMultiverseAdapter } from "./adapters/marvel-multiverse-adapter.js";
-import { FoundrySceneAdapter } from "./adapters/foundry-scene-adapter.js";
+import {
+  FoundrySceneAdapter,
+  isDestructibleTokenCombatEligible
+} from "./adapters/foundry-scene-adapter.js";
 import { FxMasterAdapter } from "./adapters/fxmaster-adapter.js";
 import { EncounterDashboard } from "./apps/dashboard.js";
 
@@ -88,6 +91,18 @@ function exposeApi() {
 
     updateObjective(id, patch) {
       return manager.updateObjective(id, patch);
+    },
+
+    reconcileDestructibleBindings(options) {
+      return manager.reconcileDestructibleBindings(options);
+    },
+
+    getDestructibleBindings(options) {
+      return manager.getDestructibleBindings(options);
+    },
+
+    get compatibility() {
+      return marvelAdapter.compatibility;
     },
 
     get activeEncounter() {
@@ -173,6 +188,15 @@ Hooks.once("init", () => {
 
 Hooks.once("ready", async () => {
   await store.load();
+  const compatibility = marvelAdapter.compatibility;
+  if (!compatibility.ok) {
+    Logger.error("Incompatible Marvel Multiverse system or API.", compatibility);
+    ui.notifications?.error(
+      compatibility.reason === "unsupported-version"
+        ? `Marvel Encounter Framework requires Marvel Multiverse ${compatibility.minimumVersion} or newer.`
+        : "Marvel Encounter Framework requires the compatible Marvel Multiverse system API."
+    );
+  }
 
   try {
     await registry.registerFromUrl(`modules/${MODULE_ID}/encounters/city-intersection/encounter.json`);
@@ -182,6 +206,9 @@ Hooks.once("ready", async () => {
   }
 
   exposeApi();
+  if (game.user.isGM && Object.keys(store.state.destructibleBindings ?? {}).length) {
+    await manager.reconcileDestructibleBindings();
+  }
   addSidebarButton();
   Hooks.callAll("marvel-encounter-framework.ready", game.marvelEncounters);
 
@@ -204,3 +231,11 @@ Hooks.on("renderSidebar", addSidebarButton);
 Hooks.on("renderSettings", addSettingsButton);
 Hooks.on("renderSettingsConfig", addSettingsButton);
 Hooks.on("getSceneControlButtons", addSceneControlButton);
+Hooks.on("preCreateCombatant", combatant => {
+  const sceneRef = combatant.sceneId ?? combatant.parent?.scene;
+  const scene = game.scenes?.get?.(sceneRef?.id ?? sceneRef) ?? canvas?.scene;
+  const token = scene?.tokens?.get?.(combatant.tokenId);
+  if (isDestructibleTokenCombatEligible(token)) return true;
+  ui.notifications?.warn("Destructible encounter objects are excluded from combat by default.");
+  return false;
+});

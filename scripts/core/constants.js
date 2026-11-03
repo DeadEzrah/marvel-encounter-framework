@@ -1,5 +1,7 @@
 export const MODULE_ID = "marvel-encounter-framework";
 export const MODULE_TITLE = "Marvel Encounter Framework";
+export const RUNTIME_SCHEMA_VERSION = 2;
+export const MINIMUM_MARVEL_VERSION = "3.10.0";
 
 export const SETTINGS = Object.freeze({
   RUNTIME_STATE: "runtimeState",

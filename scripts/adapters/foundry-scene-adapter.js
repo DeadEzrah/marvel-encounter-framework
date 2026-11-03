@@ -1,6 +1,11 @@
 import { Logger } from "../core/logger.js";
 import { MODULE_ID } from "../core/constants.js";
 
+export function isDestructibleTokenCombatEligible(token) {
+  const flags = token?.flags?.[MODULE_ID];
+  return !flags?.destructible || flags.includeInCombat === true;
+}
+
 export function applySceneArtwork(data, descriptor = {}) {
   const legacyBackground = data.background && typeof data.background === "object"
     ? data.background
@@ -145,7 +150,7 @@ export class FoundrySceneAdapter {
     return ChatMessage.create(data);
   }
 
-  async spawnActors(encounter, action, context = {}) {
+  async spawnActors(encounter, action, context = {}, { bindings = {} } = {}) {
     const scene = game.scenes?.get?.(action.sceneId ?? encounter?.sceneId)
       ?? game.scenes?.get?.(game.marvelEncounters?.state?.sceneId)
       ?? canvas?.scene;
@@ -157,41 +162,144 @@ export class FoundrySceneAdapter {
       throw new Error("spawn-actors requires a non-empty actors array.");
     }
 
-    const tokenData = [];
-    for (const placement of placements) {
+    const resolved = [];
+    for (const [placementIndex, placement] of placements.entries()) {
       const rosterEntry = roster.get(placement.actor);
       if (!rosterEntry) throw new Error(`Encounter actor '${placement.actor}' is not defined.`);
       if (!rosterEntry.uuid) throw new Error(`Encounter actor '${placement.actor}' has no compendium UUID.`);
 
-      const actor = await fromUuid(rosterEntry.uuid);
-      if (!actor || actor.documentName !== "Actor") {
-        throw new Error(`Actor UUID '${rosterEntry.uuid}' could not be resolved.`);
+      let actor;
+      try {
+        actor = await fromUuid(rosterEntry.uuid);
+      } catch (error) {
+        throw new Error(
+          `Actor UUID '${rosterEntry.uuid}' for encounter actor '${rosterEntry.id}' could not be resolved: ${error.message}`,
+          { cause: error }
+        );
       }
+      if (!actor || actor.documentName !== "Actor") {
+        throw new Error(
+          `Actor UUID '${rosterEntry.uuid}' for encounter actor '${rosterEntry.id}' did not resolve to an Actor.`
+        );
+      }
+      resolved.push({ actor, placement, placementIndex, rosterEntry });
+    }
+
+    const tokenData = [];
+    const pendingBindings = [];
+    const reusedBindings = [];
+    const missingBindings = [];
+    for (const { actor, placement, placementIndex, rosterEntry } of resolved) {
       const spawnActor = await this.#ensureWorldActor(actor, encounter, rosterEntry);
+      const destructible = Boolean(
+        actor.getFlag?.("marvel-multiverse", "destructible")
+        ?? actor.flags?.["marvel-multiverse"]?.destructible
+      );
 
       const count = Math.max(1, Number(placement.count ?? 1));
       for (let index = 0; index < count; index++) {
+        const source = placement.source ?? action.id ?? context.source ?? "action";
+        const objectBase = placement.objectId ?? placement.id
+          ?? `${source}:${rosterEntry.id}:${placementIndex}`;
+        const objectId = count > 1 ? `${objectBase}:${index}` : objectBase;
+
+        if (destructible) {
+          const existingBinding = bindings[objectId];
+          const existingToken = this.#findBoundToken(scene, existingBinding, objectId);
+          if (existingToken) {
+            reusedBindings.push(this.#createBinding({
+              encounter, scene, rosterEntry, spawnActor, source, objectId,
+              tokenId: existingToken.id,
+              actorId: existingToken.actorId ?? spawnActor.id,
+              sourceUuid: actor.uuid ?? rosterEntry.uuid
+            }));
+            continue;
+          }
+          if (existingBinding) {
+            missingBindings.push({ ...foundry.utils.deepClone(existingBinding), status: "missing" });
+            continue;
+          }
+        }
+
         const token = await spawnActor.getTokenDocument({
           x: Number(placement.x ?? action.x ?? 0) + (Number(placement.offsetX ?? 0) * index),
           y: Number(placement.y ?? action.y ?? 0) + (Number(placement.offsetY ?? 0) * index),
           hidden: placement.hidden ?? action.hidden ?? false,
           name: placement.name ?? spawnActor.name,
+          ...(destructible ? { actorLink: false } : {}),
           flags: {
             [MODULE_ID]: {
               encounterId: encounter.id,
               rosterId: rosterEntry.id,
-              source: context.source ?? "action"
+              source,
+              ...(destructible ? {
+                objectId,
+                sourceUuid: actor.uuid ?? rosterEntry.uuid,
+                destructible: true,
+                includeInCombat: placement.includeInCombat === true
+              } : {})
             }
           }
         });
         const data = token.toObject();
         delete data._id;
         tokenData.push(data);
+        pendingBindings.push(destructible ? {
+          encounter, scene, rosterEntry, spawnActor, source, objectId,
+          actorId: data.actorId ?? spawnActor.id,
+          sourceUuid: actor.uuid ?? rosterEntry.uuid
+        } : null);
       }
     }
 
-    const tokens = await scene.createEmbeddedDocuments("Token", tokenData);
-    return { ok: true, sceneId: scene.id, tokenIds: tokens.map(token => token.id) };
+    const tokens = tokenData.length
+      ? await scene.createEmbeddedDocuments("Token", tokenData)
+      : [];
+    const createdBindings = [];
+    for (let index = 0; index < tokens.length; index++) {
+      const pending = pendingBindings[index];
+      if (!pending) continue;
+      createdBindings.push(this.#createBinding({
+        ...pending,
+        tokenId: tokens[index].id,
+        actorId: tokens[index].actorId ?? pending.actorId
+      }));
+    }
+
+    return {
+      ok: missingBindings.length === 0,
+      sceneId: scene.id,
+      tokenIds: tokens.map(token => token.id),
+      bindings: [...reusedBindings, ...createdBindings, ...missingBindings],
+      reusedTokenIds: reusedBindings.map(binding => binding.tokenId),
+      missing: missingBindings
+    };
+  }
+
+  #findBoundToken(scene, binding, objectId) {
+    return scene.tokens?.get?.(binding?.tokenId)
+      ?? scene.tokens?.find?.(token =>
+        token.getFlag?.(MODULE_ID, "objectId") === objectId
+        || token.flags?.[MODULE_ID]?.objectId === objectId
+      )
+      ?? null;
+  }
+
+  #createBinding({
+    encounter, scene, rosterEntry, spawnActor, source, objectId, tokenId, actorId, sourceUuid
+  }) {
+    return {
+      version: 1,
+      encounterId: encounter.id,
+      objectId,
+      source,
+      sceneId: scene.id,
+      tokenId,
+      actorId: actorId ?? spawnActor.id ?? null,
+      rosterId: rosterEntry.id,
+      sourceActorUuid: sourceUuid,
+      status: "resolved"
+    };
   }
 
   async #ensureWorldActor(actor, encounter, rosterEntry) {
