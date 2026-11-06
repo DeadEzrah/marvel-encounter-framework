@@ -1,11 +1,13 @@
 # First-Pass Test Checklist
 
 ## Module load
-- [ ] Foundry lists Marvel Encounter Framework under Manage Modules.
-- [ ] Module enables without a manifest warning.
-- [ ] Browser console shows `marvel-encounter-framework | Ready`.
-- [ ] `game.marvelEncounters` exists.
-- [ ] Enabling Marvel Encounter Packs registers all eight encounters.
+- [x] Foundry lists Marvel Encounter Framework under Manage Modules.
+- [x] Module enables without a manifest warning.
+- [x] Browser console shows `marvel-encounter-framework | Ready`.
+  - Verified 2026-11-06 via the "Marvel Encounter Framework ready" notification on world load (Foundry 14.365, system 3.17.0).
+- [x] `game.marvelEncounters` exists.
+- [x] Enabling Marvel Encounter Packs registers all eight encounters.
+  - Verified: registry.all returned city-intersection-crisis, research-lab-breach, subway-station-attack, rooftop-chase, dockyard-warehouse, aerial-carrier-deck, superhuman-prison-breakout, alien-invasion-avenue.
 
 ## Dashboard
 - [ ] GM sidebar burst button opens the dashboard and is not duplicated by sidebar rerenders.
